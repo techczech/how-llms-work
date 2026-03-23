@@ -10,8 +10,8 @@ import {
   ChevronRight,
   ChevronLeft,
   ExternalLink,
-  PanelLeftClose,
-  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react'
 import { steps, BLOG_URL, GIST_URL } from '@/data/steps'
 import { CodePanel } from './CodePanel'
@@ -174,7 +174,34 @@ export function Visualizer({ onBack, initialStep = 0 }: { onBack?: () => void; i
 
       {/* Main panel layout */}
       <div className="flex-1 flex overflow-hidden p-3 gap-3 min-h-0">
-        {/* Left: Narrative (collapsible) */}
+        {/* Left: Code */}
+        <div className={`flex flex-col min-h-0 ${showNarrative ? 'w-[38%]' : 'w-[55%]'} transition-all duration-200`}>
+          <AnimatePresence mode="wait">
+            <motion.div key={step.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
+              <CodePanel code={step.code} annotations={step.codeAnnotations} />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Center: Diagram */}
+        <div className={`flex flex-col min-h-0 ${showNarrative ? 'w-[30%]' : 'w-[43%]'} transition-all duration-200`}>
+          <AnimatePresence mode="wait">
+            <motion.div key={step.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
+              <DiagramPanel phase={step.phase} />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Collapse toggle */}
+        <button
+          onClick={() => setShowNarrative(!showNarrative)}
+          className={`self-center shrink-0 p-1 rounded-lg transition-colors ${d ? 'hover:bg-gray-700 text-gray-500' : 'hover:bg-gray-200 text-gray-400'}`}
+          title={showNarrative ? 'Hide narrative' : 'Show narrative'}
+        >
+          {showNarrative ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+        </button>
+
+        {/* Right: Narrative (collapsible) */}
         <motion.div
           animate={{ width: showNarrative ? '30%' : 0, opacity: showNarrative ? 1 : 0 }}
           transition={{ duration: 0.2 }}
@@ -186,33 +213,6 @@ export function Visualizer({ onBack, initialStep = 0 }: { onBack?: () => void; i
             </motion.div>
           </AnimatePresence>
         </motion.div>
-
-        {/* Collapse toggle */}
-        <button
-          onClick={() => setShowNarrative(!showNarrative)}
-          className={`self-center shrink-0 p-1 rounded-lg transition-colors ${d ? 'hover:bg-gray-700 text-gray-500' : 'hover:bg-gray-200 text-gray-400'}`}
-          title={showNarrative ? 'Hide narrative' : 'Show narrative'}
-        >
-          {showNarrative ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-        </button>
-
-        {/* Center: Code */}
-        <div className={`flex flex-col min-h-0 ${showNarrative ? 'w-[38%]' : 'w-[55%]'} transition-all duration-200`}>
-          <AnimatePresence mode="wait">
-            <motion.div key={step.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-              <CodePanel code={step.code} />
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Right: Diagram */}
-        <div className={`flex flex-col min-h-0 ${showNarrative ? 'w-[30%]' : 'w-[43%]'} transition-all duration-200`}>
-          <AnimatePresence mode="wait">
-            <motion.div key={step.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-              <DiagramPanel phase={step.phase} />
-            </motion.div>
-          </AnimatePresence>
-        </div>
       </div>
     </div>
   )

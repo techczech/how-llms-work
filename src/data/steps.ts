@@ -1,3 +1,9 @@
+export interface CodeAnnotation {
+  lines: number[]  // 1-indexed line numbers
+  title: string
+  explanation: string
+}
+
 export interface Step {
   id: string
   phase: string
@@ -7,6 +13,7 @@ export interface Step {
   expandable?: { title: string; content: string }
   duration: number
   code: string
+  codeAnnotations?: CodeAnnotation[]
 }
 
 export const BLOG_URL = 'https://karpathy.github.io/2026/02/12/microgpt/'
@@ -49,6 +56,14 @@ docs = [line.strip() for line in open('input.txt')
         if line.strip()]
 random.shuffle(docs)
 print(f"num docs: {len(docs)}")`,
+    codeAnnotations: [
+      { lines: [1, 2, 3, 4, 5, 6, 7, 8], title: 'Docstring', explanation: 'The manifesto: this single file IS the complete algorithm. Everything production LLMs add (GPUs, tensors, distributed training) is optimization, not new ideas.' },
+      { lines: [10, 11, 12], title: 'Imports', explanation: 'Only 3 standard library modules. os for file I/O, math for log/exp (needed for loss and softmax), random for reproducibility and sampling. Zero external dependencies — no PyTorch, no NumPy.' },
+      { lines: [13], title: 'Random seed', explanation: 'Fixes the random number generator so every run produces identical results. Essential for debugging — without this, training would differ each time. The number 42 is a Hitchhiker\'s Guide reference.' },
+      { lines: [15, 16, 17], title: 'Dataset loading', explanation: 'Reads a file of ~32,000 baby names (one per line). The list comprehension strips whitespace and filters empty lines in one pass. Each name becomes a "document" — the model will learn to generate plausible new ones.' },
+      { lines: [18], title: 'Shuffle', explanation: 'Randomizes document order so the model doesn\'t memorize the sequence of the training data. Without shuffling, the model might learn patterns in the file ordering rather than in the names themselves.' },
+      { lines: [19], title: 'Debug print', explanation: 'Sanity check: confirms we loaded ~32,000 documents. In production, you\'d log dataset statistics (token counts, distribution) to catch data pipeline bugs early.' },
+    ],
   },
   {
     id: 'tokenizer',
@@ -81,6 +96,13 @@ tokens = [BOS] + [uchars.index(ch) for ch in doc] + [BOS]
 
 # vocab: a=0, b=1, c=2, d=3, e=4, f=5, ...
 #         z=25, BOS=26`,
+    codeAnnotations: [
+      { lines: [1, 2], title: 'Build vocabulary', explanation: 'Collects every unique character across all names, sorts them alphabetically. sorted(set(...)) gives a deterministic ordering: a=0, b=1, ..., z=25. The IDs themselves are arbitrary — what matters is each character gets a unique integer.' },
+      { lines: [3], title: 'BOS token', explanation: 'BOS (Beginning of Sequence) gets the next available ID (26). It serves double duty: marks the start of a name AND the end. The model learns that generating BOS means "I\'m done with this name."' },
+      { lines: [4, 5], title: 'Vocabulary size', explanation: '26 letters + 1 BOS = 27 tokens total. This is the number of possible outputs at each step. Production models use ~100K tokens (subword pieces), but the principle is identical.' },
+      { lines: [7, 8, 9, 10, 11], title: 'Tokenization example', explanation: 'The name "emma" becomes [BOS, e, m, m, a, BOS] = [26, 4, 12, 12, 0, 26]. Each character is replaced by its index in the sorted vocabulary. BOS bookends tell the model where names start and end.' },
+      { lines: [13], title: 'Vocabulary mapping', explanation: 'The complete mapping from characters to IDs. This is a character-level tokenizer — the simplest possible. Production tokenizers (BPE) merge frequent character pairs into single tokens for efficiency.' },
+    ],
   },
   {
     id: 'autograd',
@@ -147,6 +169,18 @@ Note the += (accumulation, not assignment). When a value is used in multiple pla
         for v in reversed(topo):
             for child, lg in zip(v._children, v._local_grads):
                 child.grad += lg * v.grad  # chain rule!`,
+    codeAnnotations: [
+      { lines: [1, 2, 3, 4, 5, 6], title: 'Value class', explanation: 'Each Value wraps a single number (.data) and tracks its gradient (.grad). It also remembers which Values produced it (_children) and the local derivatives (_local_grads). This is the foundation of automatic differentiation.' },
+      { lines: [8, 9, 10, 11], title: 'Addition', explanation: 'When two Values are added, the result remembers both inputs. The local gradients are both 1 because ∂(a+b)/∂a = 1 and ∂(a+b)/∂b = 1. The isinstance check lets you write v + 3 (auto-wrapping the 3).' },
+      { lines: [13, 14, 15, 16], title: 'Multiplication', explanation: 'For a*b, the local gradient w.r.t. a is b, and w.r.t. b is a. This is the product rule: ∂(a·b)/∂a = b. These stored gradients are used later during backpropagation.' },
+      { lines: [18, 19, 20], title: 'Power', explanation: 'Implements the power rule: ∂(x^n)/∂x = n·x^(n-1). Used for squared differences in loss computation and in the optimizer\'s square root.' },
+      { lines: [21, 22, 23], title: 'Log', explanation: 'Natural logarithm with derivative 1/x. Critical for the cross-entropy loss: -log(probability). When the model assigns high probability to the correct token, -log(p) is small (low loss).' },
+      { lines: [24, 25, 26], title: 'Exp', explanation: 'Exponential function, derivative is itself: ∂e^x/∂x = e^x. Used in softmax to convert logits to probabilities. The self-derivative property makes backprop through softmax elegant.' },
+      { lines: [27, 28, 29], title: 'ReLU', explanation: 'Rectified Linear Unit: max(0, x). Gradient is 1 if x > 0, else 0 (a binary gate). This nonlinearity is what gives the network its learning power — without it, stacked layers would collapse into one linear transformation.' },
+      { lines: [31, 32, 33, 34, 35, 36, 37, 38, 39, 40], title: 'Topological sort', explanation: 'Before backpropagating, we need to process nodes in the right order: a node\'s gradient must be fully computed before we propagate through it. This DFS-based topological sort ensures that.' },
+      { lines: [41], title: 'Seed gradient', explanation: 'Backprop starts at the loss node. ∂loss/∂loss = 1 by definition. This "1" is the seed that flows backward through the entire computation graph.' },
+      { lines: [42, 43, 44], title: 'Chain rule', explanation: 'The core of backpropagation: for each node, multiply the local gradient by the upstream gradient and ADD it to the child\'s gradient. The += (not =) is crucial — when a value is reused in multiple places, gradients from all paths must be summed.' },
+    ],
   },
   {
     id: 'parameters',
@@ -193,6 +227,13 @@ for i in range(n_layer):
 params = [p for mat in state_dict.values()
           for row in mat for p in row]
 print(f"num params: {len(params)}")  # 4,192`,
+    codeAnnotations: [
+      { lines: [1, 2, 3, 4, 5], title: 'Hyperparameters', explanation: 'These define the model\'s capacity. n_embd=16 means each token is represented as a 16-number vector. n_head=4 attention heads each get 4 dimensions (16/4). block_size=16 is the context window — the longest name is 15 characters.' },
+      { lines: [7, 8, 9, 10], title: 'Matrix factory', explanation: 'A helper that creates a 2D list of Value objects initialized with small random Gaussian numbers (std=0.08). Small initialization prevents any single parameter from dominating early training.' },
+      { lines: [12, 13, 14, 15], title: 'Embedding tables', explanation: 'wte: one 16-dim vector per token (27×16). wpe: one 16-dim vector per position (16×16). lm_head: projects the final hidden state back to 27 logits (27×16). These are lookup tables, not matrix multiplications.' },
+      { lines: [16, 17, 18, 19, 20, 21, 22, 23], title: 'Transformer layer weights', explanation: 'Each layer has: 4 attention matrices (Q, K, V projections + output, each 16×16 = 256 params) and 2 MLP matrices (expand to 64 then contract back, 16×64 + 64×16 = 2048 params). With 1 layer, that\'s ~3,328 params for the transformer block.' },
+      { lines: [25, 26, 27], title: 'Parameter list', explanation: 'Flattens every matrix into one list so the optimizer can iterate over all 4,192 parameters in a single loop. This is equivalent to PyTorch\'s model.parameters().' },
+    ],
   },
   {
     id: 'embeddings',
@@ -233,6 +274,13 @@ def gpt(token_id, pos_id, keys, values):
 # tok_emb = [0.03, -0.07, 0.12, ...] (16 numbers)
 # pos_emb = [0.01,  0.05,-0.02, ...] (16 numbers)
 # x       = [0.04, -0.02, 0.10, ...] (combined)`,
+    codeAnnotations: [
+      { lines: [1, 2, 3, 4], title: 'RMSNorm', explanation: 'Normalizes a vector so its root-mean-square is ~1. This prevents activations from growing or shrinking as they flow through layers. The 1e-5 epsilon avoids division by zero. Simpler than LayerNorm (no mean subtraction), and works just as well.' },
+      { lines: [6], title: 'GPT function signature', explanation: 'The model processes one token at a time. It takes the token ID, its position, and the running key/value caches. This is the same function used in both training (to compute loss) and inference (to generate text).' },
+      { lines: [7, 8, 9], title: 'Embedding lookup', explanation: 'Token embedding: use token_id as an index into wte to get a 16-dim vector. Position embedding: use pos_id as an index into wpe. These are simple array lookups — no math, just indexing. The vectors are learnable parameters.' },
+      { lines: [11, 12], title: 'Combine embeddings', explanation: 'Element-wise addition merges token identity and position information into a single vector. Without position embeddings, the model couldn\'t distinguish "ab" from "ba". This combined vector is the token\'s initial representation.' },
+      { lines: [14, 15], title: 'Normalize', explanation: 'RMSNorm before the first layer stabilizes the input. This is "pre-norm" style (normalize before attention/MLP), which modern transformers prefer over the original "post-norm" (normalize after).' },
+    ],
   },
   {
     id: 'attention',
@@ -284,6 +332,16 @@ The division by √head_dim prevents the dot products from getting too large, wh
             x_attn.extend(head_out)  # concat heads
         x = linear(x_attn, state_dict[f'layer{li}.attn_wo'])
         x = [a + b for a, b in zip(x, x_residual)]`,
+    codeAnnotations: [
+      { lines: [1, 2, 3], title: 'Layer loop + residual save', explanation: 'Iterates through transformer layers (just 1 here, 100+ in GPT-4). x_residual saves the input so we can add it back later — this "skip connection" is critical for training deep networks.' },
+      { lines: [4, 5, 6, 7], title: 'QKV projections', explanation: 'Three linear projections create Query, Key, and Value vectors. Q asks "what am I looking for?", K advertises "what do I contain?", V holds "what information do I provide if selected?" Each is a matrix multiply: 16→16.' },
+      { lines: [8, 9], title: 'KV cache append', explanation: 'Keys and values are stored for all previous positions. This is the KV cache — it lets us process one token at a time without recomputing attention over the whole sequence. At position t, we attend to positions 0..t.' },
+      { lines: [10, 11, 12, 13, 14, 15], title: 'Split into heads', explanation: 'The 16-dim vectors are split into 4 heads of 4 dimensions each. Each head independently selects which past tokens to attend to. This lets the model learn multiple attention patterns simultaneously.' },
+      { lines: [16, 17, 18, 19, 20, 21], title: 'Attention scores', explanation: 'Dot product between query and each cached key, divided by √head_dim (=2). The scaling prevents large dot products from making softmax too peaked. Higher score = this past token is more relevant to the current query.' },
+      { lines: [22], title: 'Softmax → weights', explanation: 'Converts raw scores to a probability distribution over past tokens. The attention weights always sum to 1.0. Softmax is shift-invariant (subtracting max for numerical stability happens inside our softmax function).' },
+      { lines: [23, 24, 25, 26, 27], title: 'Weighted value sum', explanation: 'Each head\'s output is a weighted average of all past value vectors, using the attention weights. Tokens that matched the query strongly contribute more. This is how information flows between positions.' },
+      { lines: [28, 29], title: 'Concat + project + residual', explanation: 'Head outputs (4 heads × 4 dims = 16) are concatenated and projected through attn_wo. The result is added back to x_residual — this residual connection lets gradients flow directly and makes training stable.' },
+    ],
   },
   {
     id: 'mlp',
@@ -329,6 +387,16 @@ def softmax(logits):
     # Output: project to vocabulary logits
     logits = linear(x, state_dict['lm_head'])
     return logits  # 27 numbers, one per token`,
+    codeAnnotations: [
+      { lines: [1, 2, 3], title: 'Linear projection', explanation: 'Matrix-vector multiply: each output is a dot product of one weight row with the input. This is the fundamental building block — attention projections, MLP layers, and the final output all use this same operation.' },
+      { lines: [5, 6, 7, 8, 9], title: 'Softmax', explanation: 'Converts raw logits to probabilities that sum to 1. Subtracting max_val prevents numerical overflow in exp() without changing the result (softmax is shift-invariant). Used for both attention weights and output probabilities.' },
+      { lines: [11, 12, 13], title: 'MLP: save residual + normalize', explanation: 'Same pattern as attention: save input for the skip connection, then normalize. Pre-norm ensures the MLP sees well-scaled inputs regardless of what attention did.' },
+      { lines: [14, 15], title: 'MLP: expand (16→64)', explanation: 'Projects to 4× the embedding dimension, creating a wider space for computation. This expansion ratio (4×) is a standard transformer design choice, used in GPT-2 through GPT-4.' },
+      { lines: [16, 17], title: 'MLP: ReLU activation', explanation: 'Zeroes out negative values, creating sparsity. Without this nonlinearity, the expand-then-contract would be equivalent to a single linear layer. ReLU is what gives the network its ability to learn complex, nonlinear patterns.' },
+      { lines: [18, 19], title: 'MLP: contract (64→16)', explanation: 'Projects back to the embedding dimension. The expand→nonlinearity→contract pattern lets the model compute arbitrary nonlinear functions of each token\'s representation.' },
+      { lines: [20, 21], title: 'Residual connection', explanation: 'Adds the MLP output back to the input (saved on line 12). Both attention and MLP blocks use this pattern. It ensures information can flow through the network even if a block learns nothing useful.' },
+      { lines: [23, 24, 25], title: 'Output projection', explanation: 'The final linear layer maps the 16-dim hidden state to 27 logits (one per token in the vocabulary). Higher logit = the model thinks that token is more likely to come next. These logits become probabilities via softmax.' },
+    ],
   },
   {
     id: 'training',
@@ -382,6 +450,15 @@ for step in range(num_steps):
         v_hat = v[i] / (1 - beta2**(step+1))
         p.data -= lr_t * m_hat / (v_hat**0.5 + eps)
         p.grad = 0  # reset for next step`,
+    codeAnnotations: [
+      { lines: [1, 2, 3, 4], title: 'Training loop', explanation: 'Iterates 1,000 times. Each step picks one document (cycling through the dataset), tokenizes it with BOS delimiters, and clips to block_size. In production, you\'d use batches of many documents for efficiency.' },
+      { lines: [6, 7, 8], title: 'Initialize caches', explanation: 'Fresh KV caches for each document. keys and values are lists-of-lists: one per layer, each growing as we process tokens. losses collects per-position loss values for averaging.' },
+      { lines: [9, 10, 11], title: 'Token-by-token forward', explanation: 'Process tokens sequentially. At each position, token_id is the input and target_id is what should come next. The model sees positions 0..t and must predict position t+1. This is causal (left-to-right) language modeling.' },
+      { lines: [12, 13, 14], title: 'Loss computation', explanation: 'The model outputs logits → softmax gives probabilities → take -log of the probability assigned to the correct next token. This cross-entropy loss measures surprise: -log(1.0) = 0 (not surprised), -log(0.01) = 4.6 (very surprised).' },
+      { lines: [16, 17], title: 'Average loss', explanation: 'Sum per-position losses and divide by sequence length. This gives a single scalar that measures how well the model predicted this entire document. "May yours be low" — Karpathy\'s benediction.' },
+      { lines: [19, 20], title: 'Backpropagation', explanation: 'One call walks the entire computation graph backward, computing ∂loss/∂p for every parameter. This is where the autograd engine from step 2 does its work. After this, every param.grad tells us how to reduce the loss.' },
+      { lines: [22, 23, 24, 25, 26, 27, 28, 29, 30], title: 'Adam optimizer update', explanation: 'For each parameter: update momentum (m) and adaptive rate (v), apply bias correction, then nudge p.data in the direction that reduces loss. Learning rate decays linearly so early steps explore broadly and late steps refine.' },
+    ],
   },
   {
     id: 'optimizer',
@@ -426,6 +503,14 @@ for i, p in enumerate(params):
     p.grad = 0  # reset for next step
 
 # Loss curve: 3.3 → 2.37 over 1000 steps`,
+    codeAnnotations: [
+      { lines: [1, 2, 3, 4, 5], title: 'Adam initialization', explanation: 'Learning rate 0.01, relatively high for this small model. beta1=0.85 controls momentum decay (how much to remember past gradients). beta2=0.99 controls adaptive rate decay. m and v are per-parameter running averages, initialized to zero.' },
+      { lines: [7, 8], title: 'Learning rate decay', explanation: 'Linear decay from 0.01 to 0 over training. Large steps early to explore the loss landscape broadly, small steps late to fine-tune. Most production systems use cosine decay instead, but linear works fine here.' },
+      { lines: [10, 11, 12], title: 'Momentum update', explanation: 'Exponential moving average of gradients. Like a rolling ball: if gradients consistently point the same direction, momentum builds up and pushes through flat regions or noise. beta1=0.85 means ~85% old momentum + 15% new gradient.' },
+      { lines: [14, 15], title: 'Adaptive rate', explanation: 'EMA of squared gradients tracks the typical magnitude of each parameter\'s gradient. Parameters with large, volatile gradients get effectively smaller learning rates. This per-parameter adaptation is what makes Adam better than basic SGD.' },
+      { lines: [17, 18, 19], title: 'Bias correction', explanation: 'Since m and v start at 0, early estimates are biased toward 0. Dividing by (1 - beta^step) corrects this. The correction is large for early steps and approaches 1.0 as training progresses. Without it, early updates would be too small.' },
+      { lines: [21, 22, 23], title: 'The parameter update', explanation: 'The actual weight change: step size is lr × (momentum / √adaptive_rate). The eps (1e-8) prevents division by zero. After updating, grad is reset to 0 for the next training step\'s backward pass.' },
+    ],
   },
   {
     id: 'inference',
@@ -471,6 +556,15 @@ for sample_idx in range(20):
     print(f"{''.join(sample)}")
 # Output: kamon, ann, karai, jaire, vialan,
 #   karia, yeran, anna, areli, kaina, ...`,
+    codeAnnotations: [
+      { lines: [1], title: 'Temperature', explanation: 'Controls randomness in generation. Temperature < 1 sharpens the distribution (more conservative, predictable names). Temperature > 1 flattens it (more creative, potentially weird). Temperature → 0 becomes greedy (always pick the most likely token).' },
+      { lines: [3, 4, 5, 6, 7], title: 'Sample loop setup', explanation: 'Generate 20 names. Each starts fresh with empty KV caches and the BOS token. The sample list accumulates generated characters. This autoregressive loop is the exact same process ChatGPT uses to generate responses.' },
+      { lines: [9, 10, 11], title: 'Forward pass', explanation: 'Same gpt() function as training, but no loss computation. The model sees all tokens generated so far (via KV cache) and outputs 27 logits predicting what comes next.' },
+      { lines: [13, 14], title: 'Temperature scaling', explanation: 'Divide logits by temperature BEFORE softmax. With temp=0.5, a logit of 2.0 becomes 4.0 — softmax amplifies the difference, making high-probability tokens even more likely. This is the "creativity dial."' },
+      { lines: [16, 17, 18, 19, 20], title: 'Sampling', explanation: 'random.choices picks one token weighted by the probability distribution. Unlike argmax (greedy), this introduces controlled randomness — the model usually picks likely tokens but occasionally surprises, making output more natural and varied.' },
+      { lines: [22, 23], title: 'Stop condition', explanation: 'If the model generates BOS, it\'s signaling "this name is done." We break out of the generation loop. Otherwise, we convert the token ID back to a character and append it.' },
+      { lines: [25, 26, 27], title: 'Output', explanation: 'The generated names (kamon, karai, vialan...) don\'t exist in the training data. They are "hallucinations" — statistically plausible outputs that the model invented by learning character patterns from 32K real names.' },
+    ],
   },
   {
     id: 'scaling',
@@ -513,6 +607,13 @@ for step in range(1000):
 # microgpt.py: 4,192 params, 27 tokens, 1 layer
 # GPT-4:       1T+ params, 200K tokens, 120+ layers
 # Same algorithm. Different scale.`,
+    codeAnnotations: [
+      { lines: [1, 2, 3], title: 'Pick data + tokenize', explanation: 'The two-step data pipeline: select a document, convert to token IDs with BOS delimiters. This is the same for a 200-line script and a trillion-parameter model — only the data source and tokenizer complexity differ.' },
+      { lines: [5, 6, 7, 8], title: 'Forward pass', explanation: 'Feed tokens through the model one by one, get logits, compute loss. The gpt() function encapsulates embeddings → attention → MLP → output projection. Each position predicts the next token independently (given its context).' },
+      { lines: [10], title: 'Backward pass', explanation: 'One call computes gradients for all ~4,192 parameters. The autograd engine traces backward through every addition, multiplication, softmax, attention weight, and embedding lookup that happened during the forward pass.' },
+      { lines: [12, 13, 14], title: 'Parameter update', explanation: 'Adam adjusts each parameter to reduce the loss, then resets gradients. After 1,000 iterations of this loop, the random initial parameters have been shaped into a model that captures the statistical patterns of English names.' },
+      { lines: [16, 17, 18, 19, 20], title: 'The punchline', explanation: 'microgpt and GPT-4 run the same algorithm. The differences are engineering: bigger tensors, more layers, better tokenizers, GPU parallelism, RLHF. But the core loop — forward, loss, backward, update — is exactly what you see here in 200 lines.' },
+    ],
   },
 ]
 
