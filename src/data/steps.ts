@@ -7,6 +7,7 @@ export interface CodeAnnotation {
 export interface Step {
   id: string
   phase: string
+  group: string
   title: string
   subtitle: string
   narrative: string
@@ -16,25 +17,37 @@ export interface Step {
   codeAnnotations?: CodeAnnotation[]
 }
 
+export const stepGroups = [
+  { id: 'context', label: 'Context' },
+  { id: 'preprocessing', label: 'Preprocessing' },
+  { id: 'engine', label: 'Learning Engine' },
+  { id: 'architecture', label: 'Architecture' },
+  { id: 'training', label: 'Training' },
+  { id: 'using', label: 'Using the Model' },
+] as const
+
 export const BLOG_URL = 'https://karpathy.github.io/2026/02/12/microgpt/'
 export const GIST_URL = 'https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95'
+export const COLAB_URL = 'https://colab.research.google.com/drive/1vyN5zo6rqUp_dYNbT4Yrco66zuWCZKoN?usp=sharing'
+export const NAMES_URL = 'https://raw.githubusercontent.com/karpathy/makemore/refs/heads/master/names.txt'
 
 export const steps: Step[] = [
   {
-    id: 'overview',
+    id: 'task',
     phase: 'overview',
-    title: 'The Complete Algorithm',
-    subtitle: 'microgpt.py — 200 lines, zero dependencies, one GPT',
-    narrative: `This is Karpathy's microgpt — a single file of 200 lines of pure Python with no dependencies that trains and runs a GPT. It contains the full algorithmic content: dataset, tokenizer, autograd engine, a GPT-2-like neural network, the Adam optimizer, training loop, and inference loop.
+    group: 'context',
+    title: 'The Task',
+    subtitle: 'What microgpt does and why it matters',
+    narrative: `This is Karpathy's microgpt — a single Python file that trains a tiny neural network on 32,000 baby names and then generates plausible new ones. The entire algorithm fits in 200 lines with zero dependencies: no PyTorch, no TensorFlow, no GPU required. It runs in about a minute on a laptop.
 
-"Everything else is just efficiency."
+The goal: learn which letters tend to follow which in real names, then "hallucinate" convincing new ones. After training, the model produces names like "kamon", "karai", "vialan", and "alerin" — names that sound real but aren't in the original list.
 
-The script is the culmination of multiple projects (micrograd, makemore, nanogpt) and a decade-long obsession to simplify LLMs to their bare essentials. The goal: learn the patterns in a dataset of 32,000 names, then generate ("hallucinate") plausible new ones.
+Why does this matter? This is the exact same algorithm behind ChatGPT and Claude. Same tokenizer, same attention mechanism, same training loop. The only difference is scale — 4,192 parameters here vs. hundreds of billions in production. From a production model's perspective, your conversation is just a funny-looking "document" and its response is statistical document completion.
 
-From the perspective of a model like ChatGPT, your conversation with it is just a funny looking "document". When you initialize it with your prompt, the model's response is just a statistical document completion.`,
+"Everything else is just efficiency."`,
     expandable: {
-      title: 'What is microgpt.py?',
-      content: 'A 200-line, dependency-free Python file that trains and runs a GPT from scratch. No PyTorch, no TensorFlow — just math, random, and the complete algorithm that powers every modern LLM. Available as a GitHub Gist and Google Colab notebook.',
+      title: 'How to run it yourself',
+      content: 'All you need is Python — no pip install, no dependencies. Save microgpt.py and run: python microgpt.py. The script downloads the dataset automatically, trains for 1,000 steps (~1 minute on a MacBook), then generates 20 new names. You can also run it directly in a Google Colab notebook. Try playing with the script: use a different dataset, train for longer (increase num_steps), or increase the model size for better results.',
     },
     duration: 5000,
     code: `"""
@@ -51,25 +64,74 @@ import math     # math.log, math.exp
 import random   # random.seed, random.choices
 random.seed(42) # Let there be order among chaos
 
-# Dataset: 32,000 names
-docs = [line.strip() for line in open('input.txt')
-        if line.strip()]
-random.shuffle(docs)
-print(f"num docs: {len(docs)}")`,
+# --- After training, the model generates: ---
+# sample  1: kamon
+# sample  2: ann
+# sample  3: karai
+# sample  4: jaire
+# sample  5: vialan
+# sample  6: karia
+# sample  7: yeran
+# sample  8: anna
+# sample  9: areli
+# sample 10: kaina`,
     codeAnnotations: [
       { lines: [1, 2, 3, 4, 5, 6, 7, 8], title: 'Docstring', explanation: 'The manifesto: this single file IS the complete algorithm. Everything production LLMs add (GPUs, tensors, distributed training) is optimization, not new ideas.' },
       { lines: [10, 11, 12], title: 'Imports', explanation: 'Only 3 standard library modules. os for file I/O, math for log/exp (needed for loss and softmax), random for reproducibility and sampling. Zero external dependencies — no PyTorch, no NumPy.' },
       { lines: [13], title: 'Random seed', explanation: 'Fixes the random number generator so every run produces identical results. Essential for debugging — without this, training would differ each time. The number 42 is a Hitchhiker\'s Guide reference.' },
-      { lines: [15, 16, 17], title: 'Dataset loading', explanation: 'Reads a file of ~32,000 baby names (one per line). The list comprehension strips whitespace and filters empty lines in one pass. Each name becomes a "document" — the model will learn to generate plausible new ones.' },
-      { lines: [18], title: 'Shuffle', explanation: 'Randomizes document order so the model doesn\'t memorize the sequence of the training data. Without shuffling, the model might learn patterns in the file ordering rather than in the names themselves.' },
-      { lines: [19], title: 'Debug print', explanation: 'Sanity check: confirms we loaded ~32,000 documents. In production, you\'d log dataset statistics (token counts, distribution) to catch data pipeline bugs early.' },
+      { lines: [15, 16, 17, 18, 19, 20, 21, 22, 23, 24], title: 'Sample output', explanation: 'After 1,000 training steps, the model generates these names. None of them are in the original dataset — the model learned the statistical patterns of English names and can now "hallucinate" new plausible ones. This is exactly what ChatGPT does with text, just at a much larger scale.' },
+    ],
+  },
+  {
+    id: 'dataset',
+    phase: 'dataset',
+    group: 'context',
+    title: 'The Data',
+    subtitle: '32,033 baby names — each one a "document"',
+    narrative: `The fuel of large language models is text data, optionally separated into a set of documents. In production, each document would be an internet web page, but for microgpt we use a simpler example: 32,033 baby names from US Social Security data, one per line.
+
+The script downloads names.txt automatically if it's not already present. Each name is a "document" — the model's job is to learn the patterns in the data and then generate similar new documents that share the same statistical patterns.
+
+The names are shuffled so the model doesn't memorize the file order. Instead, it learns general patterns: which letters tend to follow which, how names typically start and end, what makes a name "sound right."
+
+This is the same relationship ChatGPT has with its training data. Where microgpt sees "emma" and learns that 'm' often follows 'e', ChatGPT sees billions of web pages and learns that "the cat sat on the" is often followed by "mat." The principle is identical — only the scale differs.`,
+    expandable: {
+      title: 'What does the training output look like?',
+      content: 'When you run the script, you see the loss printed at each step: "step 1/1000 | loss 3.3660". The loss starts around 3.3 (random guessing among 27 tokens: −log(1/27) ≈ 3.3) and decreases to about 2.37 over 1,000 steps. Lower is better — the model is learning to predict which letter comes next. Perfect prediction would be loss 0, so there\'s room to improve. You can train longer or make the model bigger for better results.',
+    },
+    duration: 5000,
+    code: `# Let there be a Dataset
+# Download 32,033 baby names if not present
+if not os.path.exists('input.txt'):
+    import urllib.request
+    names_url = 'https://raw.githubusercontent.com/karpathy/makemore/master/names.txt'
+    urllib.request.urlretrieve(names_url, 'input.txt')
+docs = [line.strip() for line in open('input.txt')
+        if line.strip()]
+random.shuffle(docs)
+print(f"num docs: {len(docs)}")
+# >>> num docs: 32033
+
+# The data looks like this:
+# emma
+# olivia
+# ava
+# isabella
+# sophia
+# charlotte
+# ... (32,033 names total)`,
+    codeAnnotations: [
+      { lines: [1, 2, 3, 4, 5, 6], title: 'Auto-download', explanation: 'The script downloads names.txt from Karpathy\'s GitHub repo if not already present. This is the only network operation — once downloaded, everything runs locally. The dataset is a plain text file: one lowercase name per line.' },
+      { lines: [7, 8, 9, 10, 11], title: 'Load and shuffle', explanation: 'Reads all names, strips whitespace, filters empty lines. random.shuffle randomizes the order so the model doesn\'t memorize the sequence of the training data — it should learn patterns in the names themselves, not patterns in the file ordering.' },
+      { lines: [13, 14, 15, 16, 17, 18, 19], title: 'The raw data', explanation: 'Just lowercase names, one per line. Each name is a "document." In production LLMs, each document would be an entire web page, book chapter, or conversation. The model\'s job is the same either way: learn the statistical patterns and generate more text that shares those patterns.' },
     ],
   },
   {
     id: 'tokenizer',
     phase: 'tokenizer',
-    title: 'Tokenizer',
-    subtitle: 'Text → Numbers',
+    group: 'preprocessing',
+    title: 'Tokenize',
+    subtitle: 'Text → integers',
     narrative: `Under the hood, neural networks work with numbers, not characters, so we need a way to convert text into a sequence of integer token IDs and back. Production tokenizers like tiktoken (used by GPT-4) operate on chunks of characters for efficiency, but the simplest possible tokenizer just assigns one integer to each unique character in the dataset.
 
 We collect all unique characters across the dataset (just the lowercase letters a–z), sort them, and each letter gets an ID by its index. The integer values themselves have no meaning at all — each token is just a separate discrete symbol. Instead of 0, 1, 2 they might as well be different emoji.
@@ -107,8 +169,9 @@ tokens = [BOS] + [uchars.index(ch) for ch in doc] + [BOS]
   {
     id: 'autograd',
     phase: 'autograd',
-    title: 'Autograd',
-    subtitle: 'The engine of learning',
+    group: 'engine',
+    title: 'Backprop',
+    subtitle: 'Compute gradients',
     narrative: `Training a neural network requires gradients: for each parameter, we need to know "if I nudge this number up a little, does the loss go up or down, and by how much?"
 
 A Value wraps a single scalar number (.data) and tracks how it was computed. Think of each operation as a little lego block: it takes some inputs, produces an output (the forward pass), and it knows how its output would change with respect to each of its inputs (the local gradient). That's all the information autograd needs. Everything else is just the chain rule, stringing the blocks together.
@@ -185,6 +248,7 @@ Note the += (accumulation, not assignment). When a value is used in multiple pla
   {
     id: 'parameters',
     phase: 'parameters',
+    group: 'architecture',
     title: 'Parameters',
     subtitle: 'The model\'s knowledge',
     narrative: `The parameters are the knowledge of the model. They are a large collection of floating-point numbers (wrapped in Value for autograd) that start out random and are iteratively optimized during training.
@@ -238,8 +302,9 @@ print(f"num params: {len(params)}")  # 4,192`,
   {
     id: 'embeddings',
     phase: 'embeddings',
-    title: 'Embeddings',
-    subtitle: 'Giving tokens meaning',
+    group: 'architecture',
+    title: 'Embed',
+    subtitle: 'IDs → vectors',
     narrative: `The neural network can't process a raw token ID like 5 directly. It can only work with vectors (lists of numbers). So we associate a learned vector with each possible token, and feed that in as its neural signature.
 
 The token ID and position ID each look up a row from their respective embedding tables (wte and wpe). These two vectors are added together, giving the model a representation that encodes both what the token is and where it is in the sequence.
@@ -285,8 +350,9 @@ def gpt(token_id, pos_id, keys, values):
   {
     id: 'attention',
     phase: 'attention',
-    title: 'Attention',
-    subtitle: 'How tokens talk to each other',
+    group: 'architecture',
+    title: 'Attend',
+    subtitle: 'Tokens communicate',
     narrative: `The current token is projected into three vectors: a query (Q), a key (K), and a value (V). Intuitively, the query says "what am I looking for?", the key says "what do I contain?", and the value says "what do I offer if selected?"
 
 For example, in the name "emma", when the model is at the second "m" and trying to predict what comes next, it might learn a query like "what vowels appeared recently?" The earlier "e" would have a key that matches this query well, so it gets a high attention weight, and its value (information about being a vowel) flows into the current position.
@@ -346,8 +412,9 @@ The division by √head_dim prevents the dot products from getting too large, wh
   {
     id: 'mlp',
     phase: 'mlp',
-    title: 'MLP',
-    subtitle: 'Processing the information',
+    group: 'architecture',
+    title: 'Transform',
+    subtitle: 'MLP computation',
     narrative: `MLP is short for "multilayer perceptron" — a two-layer feed-forward network: project up to 4× the embedding dimension, apply ReLU, project back down. This is where the model does most of its "thinking" per position.
 
 Unlike attention, this computation is fully local to the current time step. The Transformer intersperses communication (Attention) with computation (MLP).
@@ -401,8 +468,9 @@ def softmax(logits):
   {
     id: 'training',
     phase: 'training',
-    title: 'Training Loop',
-    subtitle: 'Forward → Loss → Backward → Update',
+    group: 'training',
+    title: 'Train',
+    subtitle: 'Predict → loss → backprop → update',
     narrative: `The training loop repeatedly: (1) picks a document, (2) runs the model forward over its tokens, (3) computes a loss, (4) backpropagates to get gradients, and (5) updates the parameters.
 
 We feed tokens through the model one at a time, building up the KV cache. At each position, the model outputs 27 logits, which we convert to probabilities via softmax. The loss at each position is the negative log probability of the correct next token: −log p(target). This is called the cross-entropy loss.
@@ -463,8 +531,9 @@ for step in range(num_steps):
   {
     id: 'optimizer',
     phase: 'optimizer',
-    title: 'Adam Optimizer',
-    subtitle: 'Smarter than gradient descent',
+    group: 'training',
+    title: 'Update',
+    subtitle: 'Adjust parameters (Adam)',
     narrative: `We could just do p.data -= lr * p.grad (gradient descent), but Adam is smarter. It maintains two running averages per parameter:
 
 • m tracks the mean of recent gradients (momentum, like a rolling ball — helps push through flat regions)
@@ -515,8 +584,9 @@ for i, p in enumerate(params):
   {
     id: 'inference',
     phase: 'inference',
-    title: 'Inference',
-    subtitle: 'Generating new text',
+    group: 'using',
+    title: 'Predict',
+    subtitle: 'Generate new text',
     narrative: `Once training is done, we can sample new names from the model. The parameters are frozen and we just run the forward pass in a loop, feeding each generated token back as the next input.
 
 We start each sample with BOS, which tells the model "begin a new name." The model produces 27 logits, we convert them to probabilities, and we randomly sample one token. That token gets fed back in as the next input, and we repeat until the model produces BOS again ("I'm done") or we hit the maximum sequence length.
@@ -569,6 +639,7 @@ for sample_idx in range(20):
   {
     id: 'scaling',
     phase: 'scaling',
+    group: 'using',
     title: 'The Complete Picture',
     subtitle: 'Everything else is just efficiency',
     narrative: `microgpt contains the complete algorithmic essence of training and running a GPT. But between this and a production LLM like ChatGPT, there is a long list of things that change. None of them alter the core algorithm, but they are what makes it work at scale.
@@ -581,8 +652,8 @@ The model doesn't learn explicit rules — it learns a probability distribution 
 
 If you understand microgpt, you understand the algorithmic essence.`,
     expandable: {
-      title: 'FAQ: Does it "understand" anything?',
-      content: 'Mechanically: no magic is happening. The model is a big math function that maps input tokens to a probability distribution over the next token. During training, parameters are adjusted to make the correct next token more probable. Whether this constitutes "understanding" is up to you, but the mechanism is fully contained in the 200 lines above.',
+      title: 'What next? Run it, extend it, understand it',
+      content: 'All you need is Python (no pip install, no dependencies). The script takes about 1 minute on a MacBook. You can also run it in Google Colab. To see the code built up piece by piece, Karpathy provides a progression: train0.py (bigram count table, no neural net), train1.py (MLP + manual gradients), train2.py (autograd replaces manual gradients), train3.py (position embeddings + single-head attention), train4.py (multi-head attention + full GPT). Each file adds one conceptual layer. And the question "does it understand anything?" — mechanically, the model is a big math function that maps input tokens to a probability distribution. Whether that constitutes understanding is up to you, but the mechanism is fully contained in the 200 lines above.',
     },
     duration: 6000,
     code: `# The ENTIRE training loop:

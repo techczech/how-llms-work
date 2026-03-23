@@ -12,17 +12,20 @@ import {
   ExternalLink,
   PanelRightClose,
   PanelRightOpen,
+  BookOpen,
+  GraduationCap,
 } from 'lucide-react'
-import { steps, BLOG_URL, GIST_URL } from '@/data/steps'
+import { steps, stepGroups, BLOG_URL, GIST_URL } from '@/data/steps'
 import { CodePanel } from './CodePanel'
 import { DiagramPanel } from './DiagramPanel'
 import { NarrativePanel } from './NarrativePanel'
+import { GlossaryPopup } from './GlossaryPopup'
 import { useTheme } from '@/context/Theme'
 import { ThemeToggle } from './ThemeToggle'
 
 type Mode = 'auto' | 'step'
 
-export function Visualizer({ onBack, initialStep = 0 }: { onBack?: () => void; initialStep?: number }) {
+export function Visualizer({ onBack, onGlossary, onPedagogy, initialStep = 0 }: { onBack?: () => void; onGlossary?: () => void; onPedagogy?: () => void; initialStep?: number }) {
   const { theme } = useTheme()
   const d = theme === 'dark'
   const [currentStep, setCurrentStep] = useState(initialStep)
@@ -30,6 +33,7 @@ export function Visualizer({ onBack, initialStep = 0 }: { onBack?: () => void; i
   const [isPlaying, setIsPlaying] = useState(false)
   const [showExpandable, setShowExpandable] = useState(false)
   const [showNarrative, setShowNarrative] = useState(true)
+  const [glossaryTermId, setGlossaryTermId] = useState<string | null>(null)
 
   const step = steps[currentStep]
   const isLastStep = currentStep === steps.length - 1
@@ -56,8 +60,9 @@ export function Visualizer({ onBack, initialStep = 0 }: { onBack?: () => void; i
     setCurrentStep(0); setIsPlaying(false); setShowExpandable(false)
   }, [])
 
-  // Keyboard nav
+  // Keyboard nav (disabled when glossary popup is open)
   useEffect(() => {
+    if (glossaryTermId) return
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); handleNext() }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); handlePrev() }
@@ -65,12 +70,13 @@ export function Visualizer({ onBack, initialStep = 0 }: { onBack?: () => void; i
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [handleNext, handlePrev, handleReset])
+  }, [glossaryTermId, handleNext, handlePrev, handleReset])
 
   // Banner gradient per phase category
   const gradient = (() => {
     const p = step.phase
     if (p === 'overview') return d ? 'from-gray-800 to-gray-900' : 'from-gray-600 to-gray-700'
+    if (p === 'dataset') return d ? 'from-cyan-800 to-cyan-900' : 'from-cyan-600 to-cyan-700'
     if (p === 'tokenizer') return 'from-blue-700 to-blue-800'
     if (p === 'autograd') return 'from-orange-600 to-orange-700'
     if (p === 'parameters' || p === 'embeddings') return 'from-indigo-600 to-indigo-700'
@@ -104,6 +110,18 @@ export function Visualizer({ onBack, initialStep = 0 }: { onBack?: () => void; i
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <ThemeToggle className="text-white/60 hover:text-white hover:bg-white/10" />
+            {onGlossary && (
+              <button onClick={onGlossary}
+                className="flex items-center gap-1 text-xs text-white/60 hover:text-white transition-colors">
+                <BookOpen className="w-3 h-3" /> Glossary
+              </button>
+            )}
+            {onPedagogy && (
+              <button onClick={onPedagogy}
+                className="flex items-center gap-1 text-xs text-white/60 hover:text-white transition-colors">
+                <GraduationCap className="w-3 h-3" /> Pedagogy
+              </button>
+            )}
             <a href={GIST_URL} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1 text-xs text-white/60 hover:text-white transition-colors">
               Gist <ExternalLink className="w-3 h-3" />
@@ -156,20 +174,34 @@ export function Visualizer({ onBack, initialStep = 0 }: { onBack?: () => void; i
           animate={{ width: `${((currentStep + 1) / steps.length) * 100}%` }} />
       </div>
 
-      {/* Step pills */}
-      <div className={`flex px-3 py-1 border-b gap-1 overflow-x-auto shrink-0 ${d ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-        {steps.map((s, i) => (
-          <button key={s.id}
-            onClick={() => { setCurrentStep(i); setShowExpandable(false) }}
-            className={cn(
-              'px-2 py-0.5 rounded text-[10px] transition-colors whitespace-nowrap',
-              i === currentStep ? (d ? 'bg-white text-gray-900' : 'bg-gray-800 text-white')
-                : i < currentStep ? 'bg-green-100 text-green-700'
-                  : d ? 'bg-gray-700 text-gray-400 hover:bg-gray-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            )}>
-            {s.title}
-          </button>
-        ))}
+      {/* Step pills (grouped) */}
+      <div className={`flex px-3 py-1 border-b gap-0.5 overflow-x-auto shrink-0 ${d ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+        {stepGroups.map((group, gi) => {
+          const groupSteps = steps
+            .map((s, i) => ({ step: s, index: i }))
+            .filter(({ step: s }) => s.group === group.id)
+          if (groupSteps.length === 0) return null
+          return (
+            <div key={group.id} className="flex items-center gap-0.5">
+              {gi > 0 && <div className={`w-px h-4 mx-1 ${d ? 'bg-gray-700' : 'bg-gray-200'}`} />}
+              <span className={`text-[8px] uppercase tracking-wider whitespace-nowrap px-1 ${d ? 'text-gray-600' : 'text-gray-400'}`}>
+                {group.label}
+              </span>
+              {groupSteps.map(({ step: s, index: i }) => (
+                <button key={s.id}
+                  onClick={() => { setCurrentStep(i); setShowExpandable(false) }}
+                  className={cn(
+                    'px-2 py-0.5 rounded text-[10px] transition-colors whitespace-nowrap',
+                    i === currentStep ? (d ? 'bg-white text-gray-900' : 'bg-gray-800 text-white')
+                      : i < currentStep ? 'bg-green-100 text-green-700'
+                        : d ? 'bg-gray-700 text-gray-400 hover:bg-gray-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  )}>
+                  {s.title}
+                </button>
+              ))}
+            </div>
+          )
+        })}
       </div>
 
       {/* Main panel layout */}
@@ -187,7 +219,7 @@ export function Visualizer({ onBack, initialStep = 0 }: { onBack?: () => void; i
         <div className={`flex flex-col min-h-0 ${showNarrative ? 'w-[30%]' : 'w-[43%]'} transition-all duration-200`}>
           <AnimatePresence mode="wait">
             <motion.div key={step.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-              <DiagramPanel phase={step.phase} />
+              <DiagramPanel phase={step.phase} title={step.title} subtitle={step.subtitle} />
             </motion.div>
           </AnimatePresence>
         </div>
@@ -209,11 +241,18 @@ export function Visualizer({ onBack, initialStep = 0 }: { onBack?: () => void; i
         >
           <AnimatePresence mode="wait">
             <motion.div key={step.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-              <NarrativePanel step={step} showExpandable={showExpandable} onToggleExpandable={() => setShowExpandable(!showExpandable)} />
+              <NarrativePanel step={step} showExpandable={showExpandable} onToggleExpandable={() => setShowExpandable(!showExpandable)} onGlossary={setGlossaryTermId} />
             </motion.div>
           </AnimatePresence>
         </motion.div>
       </div>
+
+      {/* Glossary popup */}
+      <GlossaryPopup
+        termId={glossaryTermId}
+        onClose={() => setGlossaryTermId(null)}
+        onOpenTerm={setGlossaryTermId}
+      />
     </div>
   )
 }

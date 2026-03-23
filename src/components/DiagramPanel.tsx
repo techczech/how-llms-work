@@ -4,14 +4,17 @@ import { scaleComparison } from '@/data/steps'
 
 interface DiagramPanelProps {
   phase: string
+  title?: string
+  subtitle?: string
 }
 
-export function DiagramPanel({ phase }: DiagramPanelProps) {
+export function DiagramPanel({ phase, title, subtitle }: DiagramPanelProps) {
   const Diagram = diagrams[phase] ?? OverviewDiagram
   return (
     <div className="h-full flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
       <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-        <span className="text-sm font-medium text-gray-700">Visual</span>
+        <span className="text-lg font-bold text-gray-800">{title}</span>
+        {subtitle && <span className="text-sm text-gray-500 ml-2">{subtitle}</span>}
       </div>
       <div className="flex-1 overflow-y-auto p-5">
         <Diagram />
@@ -22,6 +25,7 @@ export function DiagramPanel({ phase }: DiagramPanelProps) {
 
 const diagrams: Record<string, () => ReactNode> = {
   overview: OverviewDiagram,
+  dataset: DatasetDiagram,
   tokenizer: TokenizerDiagram,
   autograd: AutogradDiagram,
   parameters: ParametersDiagram,
@@ -46,7 +50,7 @@ function OverviewDiagram() {
   ]
   return (
     <div className="space-y-5">
-      <p className="text-sm text-gray-500 text-center">The 7 stages of every LLM — from 200 lines to GPT-4:</p>
+      <p className="text-sm text-gray-500 text-center">What happens in one training step:</p>
       <div className="flex flex-col items-center gap-1">
         {stages.map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }} className="w-full">
@@ -58,7 +62,51 @@ function OverviewDiagram() {
           </motion.div>
         ))}
       </div>
-      <p className="text-xs text-gray-400 text-center">Repeat 1,000× → a model that generates plausible names</p>
+      <p className="text-xs text-gray-400 text-center">Each training step repeats this cycle. The walkthrough ahead explores each piece in depth.</p>
+    </div>
+  )
+}
+
+function DatasetDiagram() {
+  const names = ['emma', 'olivia', 'ava', 'isabella', 'sophia', 'charlotte', 'mia', 'amelia']
+  const generated = ['kamon', 'karai', 'vialan', 'alerin', 'karia', 'yeran', 'lenne', 'kaina']
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500 text-center">32,033 names in → plausible new names out</p>
+      <div className="flex gap-3">
+        <div className="flex-1">
+          <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-2 text-center">Training data</div>
+          <div className="space-y-1">
+            {names.map((name, i) => (
+              <motion.div key={name} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}
+                className="font-mono text-xs px-2.5 py-1 rounded bg-cyan-50 border border-cyan-200 text-cyan-700 text-center"
+              >{name}</motion.div>
+            ))}
+            <div className="text-[10px] text-gray-400 text-center">... 32,025 more</div>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+            className="text-xs text-gray-400 font-medium"
+          >train<br/>1,000×</motion.div>
+          <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.6, duration: 0.3 }}
+            className="w-8 h-0.5 bg-gray-300 my-1"
+          />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
+            className="text-gray-400">→</motion.div>
+        </div>
+        <div className="flex-1">
+          <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-2 text-center">Generated</div>
+          <div className="space-y-1">
+            {generated.map((name, i) => (
+              <motion.div key={name} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 + i * 0.06 }}
+                className="font-mono text-xs px-2.5 py-1 rounded bg-green-50 border border-green-200 text-green-700 text-center"
+              >{name}</motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-gray-400 text-center">None of the generated names are in the training data</p>
     </div>
   )
 }

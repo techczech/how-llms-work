@@ -92,7 +92,7 @@ export function CodePanel({ code, annotations = [] }: CodePanelProps) {
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="my-1.5 mx-1 p-3 bg-purple-500/10 border border-purple-500/25 rounded-lg">
+                      <div className="my-1.5 mx-1 p-3 bg-purple-500/10 border border-purple-500/25 rounded-lg" style={{ whiteSpace: 'normal', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <span className="text-xs font-semibold text-purple-300">{activeAnnotation.title}</span>
                           <button onClick={(e) => { e.stopPropagation(); setActiveAnnotation(null) }}
@@ -100,7 +100,7 @@ export function CodePanel({ code, annotations = [] }: CodePanelProps) {
                             <X className="w-3 h-3" />
                           </button>
                         </div>
-                        <p className="text-xs text-gray-400 leading-relaxed">{activeAnnotation.explanation}</p>
+                        <p className="text-xs text-gray-400 leading-relaxed" style={{ whiteSpace: 'normal' }}>{activeAnnotation.explanation}</p>
                       </div>
                     </motion.div>
                   </AnimatePresence>

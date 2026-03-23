@@ -1,15 +1,16 @@
 import { motion } from 'framer-motion'
-import { Play, ArrowRight, ExternalLink, Code, BookOpen, BarChart3, Keyboard, GraduationCap } from 'lucide-react'
-import { BLOG_URL, GIST_URL } from '@/data/steps'
+import { Play, ArrowRight, ExternalLink, Code, BookOpen, BarChart3, Keyboard, GraduationCap, List, Database, FileText, Sparkles, Zap } from 'lucide-react'
+import { BLOG_URL, GIST_URL, COLAB_URL, NAMES_URL } from '@/data/steps'
 import { useTheme } from '@/context/Theme'
 import { ThemeToggle } from './ThemeToggle'
 
 interface LandingProps {
   onStart: (stepIndex?: number) => void
   onPedagogy: () => void
+  onGlossary: () => void
 }
 
-export function Landing({ onStart, onPedagogy }: LandingProps) {
+export function Landing({ onStart, onPedagogy, onGlossary }: LandingProps) {
   const { theme } = useTheme()
   const d = theme === 'dark'
 
@@ -57,29 +58,95 @@ export function Landing({ onStart, onPedagogy }: LandingProps) {
           </button>
         </motion.div>
 
-        {/* What you'll learn */}
+        {/* What microgpt actually does */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
           className="mb-16"
         >
+          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4 text-center">What microgpt actually does</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              { icon: Database, heading: 'The task', body: 'Train a tiny neural network on 32,000 baby names, then have it invent plausible new ones \u2014 names like \u201cAdalyn\u201d or \u201cKeiran\u201d that weren\u2019t in the original list.' },
+              { icon: FileText, heading: 'The code', body: 'One Python file, 200 lines, zero dependencies. No PyTorch, no GPU needed. Runs in minutes on any laptop or in a free Google Colab notebook.' },
+              { icon: Sparkles, heading: 'What happens when you run it', body: 'The model starts by generating gibberish. Over many passes through the names, it gradually learns which letters tend to follow which \u2014 and starts producing convincing names.' },
+              { icon: Zap, heading: 'Why this matters', body: 'This is the same algorithm behind ChatGPT and Claude. Same tokenizer, same attention mechanism, same training loop. The only difference is scale \u2014 4,000 parameters here vs. billions in production.' },
+            ].map((item, i) => (
+              <motion.div
+                key={item.heading}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 + i * 0.05 }}
+                className={`flex gap-3 p-4 rounded-lg border ${
+                  d ? 'bg-white/5 border-white/5' : 'bg-gray-100 border-gray-200'
+                }`}
+              >
+                <item.icon className={`w-5 h-5 shrink-0 mt-0.5 ${d ? 'text-purple-400' : 'text-purple-500'}`} />
+                <div>
+                  <div className={`text-sm font-medium ${d ? 'text-gray-200' : 'text-gray-800'}`}>{item.heading}</div>
+                  <div className={`text-xs ${d ? 'text-gray-500' : 'text-gray-500'}`}>{item.body}</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* The dataset */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-16"
+        >
+          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4 text-center">The training data</h2>
+          <div className={`rounded-xl border overflow-hidden ${d ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+            <div className="p-5">
+              <p className={`text-sm leading-relaxed mb-4 ${d ? 'text-gray-300' : 'text-gray-600'}`}>
+                The model trains on{' '}
+                <a href={NAMES_URL} target="_blank" rel="noopener noreferrer" className={`font-medium underline underline-offset-2 ${d ? 'text-purple-400 hover:text-purple-300' : 'text-purple-600 hover:text-purple-500'}`}>
+                  names.txt
+                </a>
+                {' '}&mdash; a list of 32,033 baby names from US Social Security data, one per line. In a production LLM like ChatGPT, this would be billions of web pages. Here it&rsquo;s just names:
+              </p>
+              <div className={`font-mono text-xs rounded-lg p-3 mb-4 ${d ? 'bg-gray-800/80 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                <div>emma</div>
+                <div>olivia</div>
+                <div>ava</div>
+                <div>isabella</div>
+                <div>sophia</div>
+                <div className={d ? 'text-gray-600' : 'text-gray-400'}>... 32,028 more names</div>
+              </div>
+              <p className={`text-xs leading-relaxed ${d ? 'text-gray-500' : 'text-gray-500'}`}>
+                Each name is a &ldquo;document&rdquo; &mdash; the model sees thousands of examples of which letters tend to follow which, and learns the statistical patterns. After training, it can generate plausible new names that weren&rsquo;t in the list. From the model&rsquo;s perspective, this is exactly the same task as ChatGPT completing your prompt &mdash; just at character scale instead of word scale.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* What you'll learn */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
+          className="mb-16"
+        >
           <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4 text-center">What you'll learn</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
-              { title: 'Tokenization', desc: 'How text becomes numbers a neural network can process', step: 1 },
-              { title: 'Autograd', desc: 'The computation graph engine that makes learning possible', step: 2 },
-              { title: 'Attention', desc: 'How tokens communicate — the core of every transformer', step: 5 },
-              { title: 'MLP layers', desc: 'The feed-forward blocks where per-token computation happens', step: 6 },
-              { title: 'Training loop', desc: 'Forward pass, loss, backpropagation, and parameter updates', step: 7 },
-              { title: 'Inference', desc: 'Temperature sampling and autoregressive text generation', step: 9 },
+              { title: 'Tokenize', desc: 'How text becomes integers a neural network can process', step: 2 },
+              { title: 'Backprop', desc: 'The computation graph engine that computes gradients', step: 3 },
+              { title: 'Attend', desc: 'How tokens communicate — the core of every transformer', step: 6 },
+              { title: 'Transform', desc: 'MLP computation — the feed-forward blocks', step: 7 },
+              { title: 'Train', desc: 'Predict → loss → backprop → update parameters', step: 8 },
+              { title: 'Predict', desc: 'Temperature sampling and autoregressive text generation', step: 10 },
             ].map((item, i) => (
               <motion.button
                 key={item.title}
                 onClick={() => onStart(item.step)}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.25 + i * 0.05 }}
+                transition={{ delay: 0.55 + i * 0.05 }}
                 className={`flex gap-3 p-3 rounded-lg border transition-colors text-left cursor-pointer group ${
                   d ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-purple-500/30'
                     : 'bg-gray-100 border-gray-200 hover:bg-purple-50 hover:border-purple-300'
@@ -99,7 +166,7 @@ export function Landing({ onStart, onPedagogy }: LandingProps) {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.6 }}
           className="mb-16"
         >
           <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4 text-center">Three panels, one algorithm</h2>
@@ -113,7 +180,7 @@ export function Landing({ onStart, onPedagogy }: LandingProps) {
                 key={panel.label}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 + i * 0.08 }}
+                transition={{ delay: 0.7 + i * 0.08 }}
                 className={`p-4 rounded-lg border text-center ${d ? 'bg-white/5 border-white/5' : 'bg-gray-100 border-gray-200'}`}
               >
                 <panel.icon className={`w-6 h-6 mx-auto mb-2 ${panel.color}`} />
@@ -128,7 +195,7 @@ export function Landing({ onStart, onPedagogy }: LandingProps) {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.75 }}
           className="text-center mb-16"
         >
           <div className="inline-flex items-center gap-4 text-sm text-gray-500">
@@ -145,12 +212,13 @@ export function Landing({ onStart, onPedagogy }: LandingProps) {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.55 }}
+          transition={{ delay: 0.8 }}
           className="flex flex-wrap justify-center gap-4 mb-12"
         >
           {[
             { href: BLOG_URL, label: "Karpathy's blog post" },
             { href: GIST_URL, label: 'microgpt.py on GitHub' },
+            { href: COLAB_URL, label: 'Run in Google Colab' },
             { href: 'https://www.youtube.com/watch?v=VMj-3S1tku0', label: "Karpathy's micrograd video (2.5h)" },
           ].map((link) => (
             <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer"
@@ -164,19 +232,48 @@ export function Landing({ onStart, onPedagogy }: LandingProps) {
           ))}
         </motion.div>
 
-        {/* Pedagogy link */}
+        {/* Pedagogy + Glossary cards */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.57 }}
-          className="text-center mb-12"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.82 }}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12"
         >
           <button
-            onClick={onPedagogy}
-            className={`inline-flex items-center gap-2 text-sm transition-colors ${d ? 'text-amber-400/80 hover:text-amber-300' : 'text-amber-600 hover:text-amber-500'}`}
+            onClick={onGlossary}
+            className={`flex items-start gap-4 p-5 rounded-xl border text-left transition-colors group ${
+              d
+                ? 'bg-purple-500/5 border-purple-500/20 hover:bg-purple-500/10 hover:border-purple-500/40'
+                : 'bg-purple-50 border-purple-200 hover:bg-purple-100 hover:border-purple-300'
+            }`}
           >
-            <GraduationCap className="w-4 h-4" />
-            Why this app exists — Karpathy on education through agents
+            <List className={`w-7 h-7 shrink-0 mt-0.5 ${d ? 'text-purple-400' : 'text-purple-500'}`} />
+            <div>
+              <div className={`font-semibold mb-1 group-hover:text-purple-500 transition-colors ${d ? 'text-gray-100' : 'text-gray-800'}`}>
+                Glossary
+              </div>
+              <div className={`text-xs leading-relaxed ${d ? 'text-gray-400' : 'text-gray-500'}`}>
+                40 key terms explained in plain language — from tokens and embeddings to attention, backpropagation, and temperature.
+              </div>
+            </div>
+          </button>
+          <button
+            onClick={onPedagogy}
+            className={`flex items-start gap-4 p-5 rounded-xl border text-left transition-colors group ${
+              d
+                ? 'bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10 hover:border-amber-500/40'
+                : 'bg-amber-50 border-amber-200 hover:bg-amber-100 hover:border-amber-300'
+            }`}
+          >
+            <GraduationCap className={`w-7 h-7 shrink-0 mt-0.5 ${d ? 'text-amber-400' : 'text-amber-500'}`} />
+            <div>
+              <div className={`font-semibold mb-1 group-hover:text-amber-500 transition-colors ${d ? 'text-gray-100' : 'text-gray-800'}`}>
+                Why this app exists
+              </div>
+              <div className={`text-xs leading-relaxed ${d ? 'text-gray-400' : 'text-gray-500'}`}>
+                Karpathy on teaching through building — the pedagogy behind making LLMs understandable in 200 lines.
+              </div>
+            </div>
           </button>
         </motion.div>
 
@@ -184,7 +281,7 @@ export function Landing({ onStart, onPedagogy }: LandingProps) {
         <motion.footer
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.85 }}
           className={`text-center text-sm border-t pt-8 ${d ? 'text-gray-600 border-white/5' : 'text-gray-500 border-gray-200'}`}
         >
           <p>
