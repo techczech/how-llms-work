@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChevronLeft, Info, Bot, Code, User, ExternalLink, FileText } from 'lucide-react'
+import { ChevronLeft, Info, Bot, Code, User, ExternalLink, FileText, Repeat } from 'lucide-react'
 import { useTheme } from '@/context/Theme'
 import { ThemeToggle } from './ThemeToggle'
 import { BLOG_URL, GIST_URL } from '@/data/steps'
@@ -111,6 +111,21 @@ export function About({ onBack, onStart }: AboutProps) {
             </p>
             <p className={`text-sm leading-relaxed ${d ? 'text-gray-400' : 'text-gray-500'}`}>
               This is itself a demonstration of Karpathy's thesis: the irreducible human contribution is the 200 lines of code and the decision to build this walkthrough. Everything else — the explanations, the UI, the glossary — is agent work, steered by human judgment.
+            </p>
+          </section>
+
+          {/* Reusable pattern */}
+          <section className={`rounded-xl border p-6 space-y-4 ${d ? 'bg-gray-900/50 border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${d ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+                <Repeat className="w-5 h-5 text-amber-500" />
+              </div>
+              <h2 className={`text-lg font-semibold ${d ? 'text-white' : 'text-gray-900'}`}>Reusable as a pattern</h2>
+            </div>
+            <p className={`text-base leading-relaxed ${d ? 'text-gray-300' : 'text-gray-700'}`}>
+              The walkthrough architecture — step-indexed data, three-panel layout, glossary linkification, LLM-accessible content — is documented as a reusable{' '}
+              <a href="https://github.com/techczech/simulation-walkthrough" target="_blank" rel="noopener noreferrer" className={`underline underline-offset-2 ${d ? 'text-blue-400' : 'text-blue-600'}`}>simulation-walkthrough skill</a>
+              {' '}for AI coding agents. Give it any source code or concept, and it generates an interactive walkthrough app like this one.
             </p>
           </section>
 
