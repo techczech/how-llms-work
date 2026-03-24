@@ -1,0 +1,68 @@
+# How LLMs Work — Interactive Walkthrough
+
+> An interactive walkthrough of Karpathy's microgpt: a complete GPT implementation in 200 lines of pure Python, with no dependencies.
+> https://howllmswork-4fw.pages.dev
+
+## What this is
+
+This site teaches how large language models work from the ground up, by walking through every line of microgpt.py — a 200-line Python script that trains a character-level GPT on 32,033 baby names and generates new ones. The same algorithm powers ChatGPT, just at a different scale.
+
+## Source material
+
+- Blog post: https://karpathy.github.io/2026/02/12/microgpt/
+- Code (gist): https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95
+- Google Colab: https://colab.research.google.com/drive/1vyN5zo6rqUp_dYNbT4Yrco66zuWCZKoN?usp=sharing
+
+## Walkthrough Steps
+
+### Context
+1. **The Task** — What microgpt does and why it matters
+2. **The Data** — 32,033 baby names — each one a "document"
+
+### Preprocessing
+3. **Tokenize** — Text → integers
+
+### Learning Engine
+4. **Backprop** — Compute gradients
+
+### Architecture
+5. **Parameters** — The model's knowledge
+6. **Embed** — IDs → vectors
+7. **Attend** — Tokens communicate
+8. **Transform** — MLP computation
+
+### Training
+9. **Train** — Predict → loss → backprop → update
+10. **Update** — Adjust parameters (Adam)
+
+### Using the Model
+11. **Predict** — Generate new text
+12. **The Complete Picture** — Everything else is just efficiency
+
+## Glossary (41 terms)
+
+- **Text to Numbers** (5 terms): Token, Vocabulary, BOS (Beginning of Sequence), BPE (Byte Pair Encoding), Embedding
+- **Model Structure** (9 terms): Parameter, Weight / Weight Matrix, State Dict, Vector, Dimension (n_embd), MLP (Multilayer Perceptron), ReLU (Rectified Linear Unit), Residual Connection (Skip Connection), RMSNorm (Root Mean Square Normalization)
+- **Attention Mechanism** (5 terms): Attention, Query, Key, Value (Q, K, V), Attention Head, KV Cache, Softmax
+- **Learning & Training** (11 terms): Gradient, Backpropagation (Backward Pass), Chain Rule, Autograd (Automatic Differentiation), Value (Autograd Wrapper), Loss (Cross-Entropy Loss), Forward Pass, Training Loop, Adam Optimizer, Learning Rate, Epoch / Training Step
+- **Generation & Output** (5 terms): Logit, Inference (Generation), Temperature, Sampling, Hallucination
+- **The Big Picture** (6 terms): Layer (Transformer Layer), Context Window (Block Size), Transformer, GPT (Generative Pre-trained Transformer), Post-Training (SFT + RLHF), Tensor
+
+## Scale Comparison: microgpt vs Production LLMs
+
+| Dimension | microgpt | Production |
+|-----------|----------|------------|
+| Parameters | 4,192 | 100B – 1T+ |
+| Layers | 1 | 80 – 120+ |
+| Embedding dim | 16 | 8,192 – 12,288 |
+| Context window | 16 tokens | 128K – 1M+ |
+| Vocabulary | 27 chars | 100K – 200K tokens |
+| Training data | 32K names | Trillions of tokens |
+| Compute | Python scalars | Thousands of GPUs |
+| Tokenizer | Character-level | BPE / SentencePiece |
+| Post-training | None | SFT + RLHF |
+
+## Full content
+
+For the complete narratives, code annotations, and glossary definitions, see:
+https://howllmswork-4fw.pages.dev/llms-full.txt

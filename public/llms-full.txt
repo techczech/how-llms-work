@@ -1,0 +1,1073 @@
+# How LLMs Work — Complete Walkthrough Content
+
+> Source: https://howllmswork-4fw.pages.dev
+> Based on Karpathy's microgpt — a complete GPT in 200 lines of Python
+> Blog: https://karpathy.github.io/2026/02/12/microgpt/
+> Gist: https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95
+> Colab: https://colab.research.google.com/drive/1vyN5zo6rqUp_dYNbT4Yrco66zuWCZKoN?usp=sharing
+
+This document contains the full text content of the interactive walkthrough at https://howllmswork-4fw.pages.dev. It is structured for LLM consumption following the llms.txt convention. Each step includes pedagogical narrative, code from microgpt.py with line numbers, and line-by-line code annotations. A complete glossary follows the walkthrough.
+
+---
+
+# Walkthrough
+
+## Step 1: The Task
+*What microgpt does and why it matters*
+
+### Narrative
+
+This is Karpathy's microgpt — a single Python file that trains a tiny neural network on 32,000 baby names and then generates plausible new ones. The entire algorithm fits in 200 lines with zero dependencies: no PyTorch, no TensorFlow, no GPU required. It runs in about a minute on a laptop.
+
+The goal: learn which letters tend to follow which in real names, then "hallucinate" convincing new ones. After training, the model produces names like "kamon", "karai", "vialan", and "alerin" — names that sound real but aren't in the original list.
+
+Why does this matter? This is the exact same algorithm behind ChatGPT and Claude. Same tokenizer, same attention mechanism, same training loop. The only difference is scale — 4,192 parameters here vs. hundreds of billions in production. From a production model's perspective, your conversation is just a funny-looking "document" and its response is statistical document completion.
+
+"Everything else is just efficiency."
+
+### How to run it yourself
+
+All you need is Python — no pip install, no dependencies. Save microgpt.py and run: python microgpt.py. The script downloads the dataset automatically, trains for 1,000 steps (~1 minute on a MacBook), then generates 20 new names. You can also run it directly in a Google Colab notebook. Try playing with the script: use a different dataset, train for longer (increase num_steps), or increase the model size for better results.
+
+### Code (microgpt.py lines 1–25)
+
+```python
+  1 """
+  2 The most atomic way to train and run inference
+  3 for a GPT in pure, dependency-free Python.
+  4 This file is the complete algorithm.
+  5 Everything else is just efficiency.
+  6 
+  7 @karpathy
+  8 """
+  9 
+ 10 import os       # os.path.exists
+ 11 import math     # math.log, math.exp
+ 12 import random   # random.seed, random.choices
+ 13 random.seed(42) # Let there be order among chaos
+ 14 
+ 15 # --- After training, the model generates: ---
+ 16 # sample  1: kamon
+ 17 # sample  2: ann
+ 18 # sample  3: karai
+ 19 # sample  4: jaire
+ 20 # sample  5: vialan
+ 21 # sample  6: karia
+ 22 # sample  7: yeran
+ 23 # sample  8: anna
+ 24 # sample  9: areli
+ 25 # sample 10: kaina
+```
+
+### Code Annotations
+
+- **Docstring** (lines 1–8): The manifesto: this single file IS the complete algorithm. Everything production LLMs add (GPUs, tensors, distributed training) is optimization, not new ideas.
+- **Imports** (lines 10–12): Only 3 standard library modules. os for file I/O, math for log/exp (needed for loss and softmax), random for reproducibility and sampling. Zero external dependencies — no PyTorch, no NumPy.
+- **Random seed** (line 13): Fixes the random number generator so every run produces identical results. Essential for debugging — without this, training would differ each time. The number 42 is a Hitchhiker's Guide reference.
+- **Sample output** (lines 15–24): After 1,000 training steps, the model generates these names. None of them are in the original dataset — the model learned the statistical patterns of English names and can now "hallucinate" new plausible ones. This is exactly what ChatGPT does with text, just at a much larger scale.
+
+---
+
+## Step 2: The Data
+*32,033 baby names — each one a "document"*
+
+### Narrative
+
+The fuel of large language models is text data, optionally separated into a set of documents. In production, each document would be an internet web page, but for microgpt we use a simpler example: 32,033 baby names from US Social Security data, one per line.
+
+The script downloads names.txt automatically if it's not already present. Each name is a "document" — the model's job is to learn the patterns in the data and then generate similar new documents that share the same statistical patterns.
+
+The names are shuffled so the model doesn't memorize the file order. Instead, it learns general patterns: which letters tend to follow which, how names typically start and end, what makes a name "sound right."
+
+This is the same relationship ChatGPT has with its training data. Where microgpt sees "emma" and learns that 'm' often follows 'e', ChatGPT sees billions of web pages and learns that "the cat sat on the" is often followed by "mat." The principle is identical — only the scale differs.
+
+### What does the training output look like?
+
+When you run the script, you see the loss printed at each step: "step 1/1000 | loss 3.3660". The loss starts around 3.3 (random guessing among 27 tokens: −log(1/27) ≈ 3.3) and decreases to about 2.37 over 1,000 steps. Lower is better — the model is learning to predict which letter comes next. Perfect prediction would be loss 0, so there's room to improve. You can train longer or make the model bigger for better results.
+
+### Code (microgpt.py lines 14–33)
+
+```python
+ 14 # Let there be a Dataset
+ 15 # Download 32,033 baby names if not present
+ 16 if not os.path.exists('input.txt'):
+ 17     import urllib.request
+ 18     names_url = 'https://raw.githubusercontent.com/karpathy/makemore/master/names.txt'
+ 19     urllib.request.urlretrieve(names_url, 'input.txt')
+ 20 docs = [line.strip() for line in open('input.txt')
+ 21         if line.strip()]
+ 22 random.shuffle(docs)
+ 23 print(f"num docs: {len(docs)}")
+ 24 # >>> num docs: 32033
+ 25 
+ 26 # The data looks like this:
+ 27 # emma
+ 28 # olivia
+ 29 # ava
+ 30 # isabella
+ 31 # sophia
+ 32 # charlotte
+ 33 # ... (32,033 names total)
+```
+
+### Code Annotations
+
+- **Auto-download** (lines 14–19): The script downloads names.txt from Karpathy's GitHub repo if not already present. This is the only network operation — once downloaded, everything runs locally. The dataset is a plain text file: one lowercase name per line.
+- **Load and shuffle** (lines 20–24): Reads all names, strips whitespace, filters empty lines. random.shuffle randomizes the order so the model doesn't memorize the sequence of the training data — it should learn patterns in the names themselves, not patterns in the file ordering.
+- **The raw data** (lines 26–32): Just lowercase names, one per line. Each name is a "document." In production LLMs, each document would be an entire web page, book chapter, or conversation. The model's job is the same either way: learn the statistical patterns and generate more text that shares those patterns.
+
+---
+
+## Step 3: Tokenize
+*Text → integers*
+
+### Narrative
+
+Under the hood, neural networks work with numbers, not characters, so we need a way to convert text into a sequence of integer token IDs and back. Production tokenizers like tiktoken (used by GPT-4) operate on chunks of characters for efficiency, but the simplest possible tokenizer just assigns one integer to each unique character in the dataset.
+
+We collect all unique characters across the dataset (just the lowercase letters a–z), sort them, and each letter gets an ID by its index. The integer values themselves have no meaning at all — each token is just a separate discrete symbol. Instead of 0, 1, 2 they might as well be different emoji.
+
+We also create one special token called BOS (Beginning of Sequence), which acts as a delimiter: it tells the model "a new document starts/ends here." During training, each name gets wrapped with BOS on both sides: [BOS, e, m, m, a, BOS]. The model learns that BOS initiates a new name, and another BOS ends it.
+
+Final vocabulary: 27 tokens (26 lowercase letters + 1 BOS token).
+
+### How do production tokenizers differ?
+
+Production models use subword tokenizers like BPE (Byte Pair Encoding), which learn to merge frequently co-occurring character sequences into single tokens. Common words like "the" become one token, rare words get broken into pieces. This gives a vocabulary of ~100K tokens and is much more efficient because the model sees more content per position.
+
+### Code (microgpt.py lines 23–36)
+
+```python
+ 23 # unique characters become token ids 0..n-1
+ 24 uchars = sorted(set(''.join(docs)))
+ 25 BOS = len(uchars)       # Beginning of Sequence token
+ 26 vocab_size = len(uchars) + 1  # +1 for BOS
+ 27 print(f"vocab size: {vocab_size}")
+ 28 
+ 29 # Example: tokenize "emma"
+ 30 doc = "emma"
+ 31 tokens = [BOS] + [uchars.index(ch) for ch in doc] + [BOS]
+ 32 # tokens = [26, 4, 12, 12, 0, 26]
+ 33 #           BOS  e   m   m   a  BOS
+ 34 
+ 35 # vocab: a=0, b=1, c=2, d=3, e=4, f=5, ...
+ 36 #         z=25, BOS=26
+```
+
+### Code Annotations
+
+- **Build vocabulary** (lines 23–24): Collects every unique character across all names, sorts them alphabetically. sorted(set(...)) gives a deterministic ordering: a=0, b=1, ..., z=25. The IDs themselves are arbitrary — what matters is each character gets a unique integer.
+- **BOS token** (line 25): BOS (Beginning of Sequence) gets the next available ID (26). It serves double duty: marks the start of a name AND the end. The model learns that generating BOS means "I'm done with this name."
+- **Vocabulary size** (lines 26–27): 26 letters + 1 BOS = 27 tokens total. This is the number of possible outputs at each step. Production models use ~100K tokens (subword pieces), but the principle is identical.
+- **Tokenization example** (lines 29–33): The name "emma" becomes [BOS, e, m, m, a, BOS] = [26, 4, 12, 12, 0, 26]. Each character is replaced by its index in the sorted vocabulary. BOS bookends tell the model where names start and end.
+- **Vocabulary mapping** (line 35): The complete mapping from characters to IDs. This is a character-level tokenizer — the simplest possible. Production tokenizers (BPE) merge frequent character pairs into single tokens for efficiency.
+
+---
+
+## Step 4: Backprop
+*Compute gradients*
+
+### Narrative
+
+Training a neural network requires gradients: for each parameter, we need to know "if I nudge this number up a little, does the loss go up or down, and by how much?"
+
+A Value wraps a single scalar number (.data) and tracks how it was computed. Think of each operation as a little lego block: it takes some inputs, produces an output (the forward pass), and it knows how its output would change with respect to each of its inputs (the local gradient). That's all the information autograd needs. Everything else is just the chain rule, stringing the blocks together.
+
+Every time you do math with Value objects (add, multiply, etc.), the result is a new Value that remembers its inputs and the local derivative. For example, __mul__ records that ∂(a·b)/∂a = b and ∂(a·b)/∂b = a.
+
+The backward() method walks the graph in reverse topological order, applying the chain rule at each step. We kick things off by setting self.grad = 1 at the loss node, because ∂L/∂L = 1. From there, the chain rule just multiplies local gradients along every path back to the parameters.
+
+Note the += (accumulation, not assignment). When a value is used in multiple places in the graph, gradients flow back along each branch independently and must be summed.
+
+"If a car travels twice as fast as a bicycle and the bicycle is four times as fast as a walking man, then the car travels 2 × 4 = 8 times as fast as the man." The chain rule is the same idea: you multiply the rates of change along the path.
+
+### How does this compare to PyTorch?
+
+This is the same algorithm that PyTorch's loss.backward() runs, just on scalars instead of tensors (arrays of scalars). Algorithmically identical, significantly smaller and simpler, but of course a lot less efficient. Production systems use tensors and run on GPUs that perform billions of floating-point operations per second.
+
+### Code (microgpt.py lines 30–73)
+
+```python
+ 30 class Value:
+ 31     def __init__(self, data, children=(), local_grads=()):
+ 32         self.data = data          # forward: computed value
+ 33         self.grad = 0             # backward: ∂loss/∂self
+ 34         self._children = children
+ 35         self._local_grads = local_grads
+ 36 
+ 37     def __add__(self, other):
+ 38         other = other if isinstance(other, Value) else Value(other)
+ 39         return Value(self.data + other.data,
+ 40                      (self, other), (1, 1))
+ 41 
+ 42     def __mul__(self, other):
+ 43         other = other if isinstance(other, Value) else Value(other)
+ 44         return Value(self.data * other.data,
+ 45                      (self, other), (other.data, self.data))
+ 46 
+ 47     def __pow__(self, n):
+ 48         return Value(self.data**n, (self,),
+ 49                      (n * self.data**(n-1),))
+ 50     def log(self):
+ 51         return Value(math.log(self.data), (self,),
+ 52                      (1/self.data,))
+ 53     def exp(self):
+ 54         return Value(math.exp(self.data), (self,),
+ 55                      (math.exp(self.data),))
+ 56     def relu(self):
+ 57         return Value(max(0, self.data), (self,),
+ 58                      (float(self.data > 0),))
+ 59 
+ 60     def backward(self):
+ 61         topo = []
+ 62         visited = set()
+ 63         def build_topo(v):
+ 64             if v not in visited:
+ 65                 visited.add(v)
+ 66                 for child in v._children:
+ 67                     build_topo(child)
+ 68                 topo.append(v)
+ 69         build_topo(self)
+ 70         self.grad = 1  # ∂loss/∂loss = 1
+ 71         for v in reversed(topo):
+ 72             for child, lg in zip(v._children, v._local_grads):
+ 73                 child.grad += lg * v.grad  # chain rule!
+```
+
+### Code Annotations
+
+- **Value class** (lines 30–35): Each Value wraps a single number (.data) and tracks its gradient (.grad). It also remembers which Values produced it (_children) and the local derivatives (_local_grads). This is the foundation of automatic differentiation.
+- **Addition** (lines 37–40): When two Values are added, the result remembers both inputs. The local gradients are both 1 because ∂(a+b)/∂a = 1 and ∂(a+b)/∂b = 1. The isinstance check lets you write v + 3 (auto-wrapping the 3).
+- **Multiplication** (lines 42–45): For a*b, the local gradient w.r.t. a is b, and w.r.t. b is a. This is the product rule: ∂(a·b)/∂a = b. These stored gradients are used later during backpropagation.
+- **Power** (lines 47–49): Implements the power rule: ∂(x^n)/∂x = n·x^(n-1). Used for squared differences in loss computation and in the optimizer's square root.
+- **Log** (lines 50–52): Natural logarithm with derivative 1/x. Critical for the cross-entropy loss: -log(probability). When the model assigns high probability to the correct token, -log(p) is small (low loss).
+- **Exp** (lines 53–55): Exponential function, derivative is itself: ∂e^x/∂x = e^x. Used in softmax to convert logits to probabilities. The self-derivative property makes backprop through softmax elegant.
+- **ReLU** (lines 56–58): Rectified Linear Unit: max(0, x). Gradient is 1 if x > 0, else 0 (a binary gate). This nonlinearity is what gives the network its learning power — without it, stacked layers would collapse into one linear transformation.
+- **Topological sort** (lines 60–69): Before backpropagating, we need to process nodes in the right order: a node's gradient must be fully computed before we propagate through it. This DFS-based topological sort ensures that.
+- **Seed gradient** (line 70): Backprop starts at the loss node. ∂loss/∂loss = 1 by definition. This "1" is the seed that flows backward through the entire computation graph.
+- **Chain rule** (lines 71–73): The core of backpropagation: for each node, multiply the local gradient by the upstream gradient and ADD it to the child's gradient. The += (not =) is crucial — when a value is reused in multiple places, gradients from all paths must be summed.
+
+---
+
+## Step 5: Parameters
+*The model's knowledge*
+
+### Narrative
+
+The parameters are the knowledge of the model. They are a large collection of floating-point numbers (wrapped in Value for autograd) that start out random and are iteratively optimized during training.
+
+Each parameter is initialized to a small random number drawn from a Gaussian distribution. The state_dict organizes them into named matrices (borrowing PyTorch's terminology): embedding tables, attention weights, MLP weights, and a final output projection.
+
+We also flatten all parameters into a single list so the optimizer can loop over them later. In our tiny model this comes out to 4,192 parameters. GPT-2 had 1.6 billion, and modern LLMs have hundreds of billions.
+
+The exact role of each parameter will make more sense once we define the model architecture, but the key dimensions are: n_embd=16 (embedding width), n_head=4 (attention heads), n_layer=1 (transformer depth), and block_size=16 (max context length — the longest name is 15 characters).
+
+### How do parameters scale?
+
+Our model: 4,192 parameters. GPT-2: 1.6 billion. GPT-4-class models: hundreds of billions to over a trillion. The architecture is the same — just much wider (embedding dimensions of 10,000+) and much deeper (100+ layers).
+
+### Code (microgpt.py lines 75–102)
+
+```python
+ 75 n_embd = 16      # embedding dimension (width)
+ 76 n_head = 4       # number of attention heads
+ 77 n_layer = 1      # transformer depth
+ 78 block_size = 16  # max context length
+ 79 head_dim = n_embd // n_head  # = 4
+ 80 
+ 81 # Initialize random weight matrices
+ 82 matrix = lambda nout, nin, std=0.08: [
+ 83     [Value(random.gauss(0, std)) for _ in range(nin)]
+ 84     for _ in range(nout)
+ 85 ]
+ 86 
+ 87 state_dict = {
+ 88     'wte': matrix(vocab_size, n_embd),    # token embeddings
+ 89     'wpe': matrix(block_size, n_embd),    # position embeddings
+ 90     'lm_head': matrix(vocab_size, n_embd),# output projection
+ 91 }
+ 92 for i in range(n_layer):
+ 93     state_dict[f'layer{i}.attn_wq'] = matrix(n_embd, n_embd)
+ 94     state_dict[f'layer{i}.attn_wk'] = matrix(n_embd, n_embd)
+ 95     state_dict[f'layer{i}.attn_wv'] = matrix(n_embd, n_embd)
+ 96     state_dict[f'layer{i}.attn_wo'] = matrix(n_embd, n_embd)
+ 97     state_dict[f'layer{i}.mlp_fc1'] = matrix(4*n_embd, n_embd)
+ 98     state_dict[f'layer{i}.mlp_fc2'] = matrix(n_embd, 4*n_embd)
+ 99 
+100 params = [p for mat in state_dict.values()
+101           for row in mat for p in row]
+102 print(f"num params: {len(params)}")  # 4,192
+```
+
+### Code Annotations
+
+- **Hyperparameters** (lines 75–79): These define the model's capacity. n_embd=16 means each token is represented as a 16-number vector. n_head=4 attention heads each get 4 dimensions (16/4). block_size=16 is the context window — the longest name is 15 characters.
+- **Matrix factory** (lines 81–84): A helper that creates a 2D list of Value objects initialized with small random Gaussian numbers (std=0.08). Small initialization prevents any single parameter from dominating early training.
+- **Embedding tables** (lines 86–89): wte: one 16-dim vector per token (27×16). wpe: one 16-dim vector per position (16×16). lm_head: projects the final hidden state back to 27 logits (27×16). These are lookup tables, not matrix multiplications.
+- **Transformer layer weights** (lines 90–97): Each layer has: 4 attention matrices (Q, K, V projections + output, each 16×16 = 256 params) and 2 MLP matrices (expand to 64 then contract back, 16×64 + 64×16 = 2048 params). With 1 layer, that's ~3,328 params for the transformer block.
+- **Parameter list** (lines 99–101): Flattens every matrix into one list so the optimizer can iterate over all 4,192 parameters in a single loop. This is equivalent to PyTorch's model.parameters().
+
+---
+
+## Step 6: Embed
+*IDs → vectors*
+
+### Narrative
+
+The neural network can't process a raw token ID like 5 directly. It can only work with vectors (lists of numbers). So we associate a learned vector with each possible token, and feed that in as its neural signature.
+
+The token ID and position ID each look up a row from their respective embedding tables (wte and wpe). These two vectors are added together, giving the model a representation that encodes both what the token is and where it is in the sequence.
+
+Without position information, "cat sat" and "sat cat" would be identical to the model. Modern LLMs usually skip learned position embeddings and use relative-based schemes like RoPE instead, but the principle is the same.
+
+The embedding dimension (16 here, 12,288 in GPT-4) determines the model's capacity to represent nuance. Everything the model knows about a token at a given position must fit into this single vector.
+
+### What is RMSNorm?
+
+RMSNorm (Root Mean Square Normalization) rescales a vector so its values have unit root-mean-square. This keeps activations from growing or shrinking as they flow through the network, which stabilizes training. It's a simpler variant of the LayerNorm used in the original GPT-2.
+
+### Code (microgpt.py lines 103–124)
+
+```python
+103 def rmsnorm(x):
+104     ms = sum(xi * xi for xi in x) / len(x)
+105     scale = (ms + 1e-5) ** -0.5
+106     return [xi * scale for xi in x]
+107 
+108 def gpt(token_id, pos_id, keys, values):
+109     # Look up embeddings (simple table lookup!)
+110     tok_emb = state_dict['wte'][token_id]  # [16 values]
+111     pos_emb = state_dict['wpe'][pos_id]    # [16 values]
+112 
+113     # Combine: element-wise addition
+114     x = [t + p for t, p in zip(tok_emb, pos_emb)]
+115 
+116     # Normalize
+117     x = rmsnorm(x)
+118 
+119     # ... (attention + MLP layers follow)
+120 
+121 # Example: token "e" (id=4) at position 1
+122 # tok_emb = [0.03, -0.07, 0.12, ...] (16 numbers)
+123 # pos_emb = [0.01,  0.05,-0.02, ...] (16 numbers)
+124 # x       = [0.04, -0.02, 0.10, ...] (combined)
+```
+
+### Code Annotations
+
+- **RMSNorm** (lines 103–106): Normalizes a vector so its root-mean-square is ~1. This prevents activations from growing or shrinking as they flow through layers. The 1e-5 epsilon avoids division by zero. Simpler than LayerNorm (no mean subtraction), and works just as well.
+- **GPT function signature** (line 108): The model processes one token at a time. It takes the token ID, its position, and the running key/value caches. This is the same function used in both training (to compute loss) and inference (to generate text).
+- **Embedding lookup** (lines 109–111): Token embedding: use token_id as an index into wte to get a 16-dim vector. Position embedding: use pos_id as an index into wpe. These are simple array lookups — no math, just indexing. The vectors are learnable parameters.
+- **Combine embeddings** (lines 113–114): Element-wise addition merges token identity and position information into a single vector. Without position embeddings, the model couldn't distinguish "ab" from "ba". This combined vector is the token's initial representation.
+- **Normalize** (lines 116–117): RMSNorm before the first layer stabilizes the input. This is "pre-norm" style (normalize before attention/MLP), which modern transformers prefer over the original "post-norm" (normalize after).
+
+---
+
+## Step 7: Attend
+*Tokens communicate*
+
+### Narrative
+
+The current token is projected into three vectors: a query (Q), a key (K), and a value (V). Intuitively, the query says "what am I looking for?", the key says "what do I contain?", and the value says "what do I offer if selected?"
+
+For example, in the name "emma", when the model is at the second "m" and trying to predict what comes next, it might learn a query like "what vowels appeared recently?" The earlier "e" would have a key that matches this query well, so it gets a high attention weight, and its value (information about being a vowel) flows into the current position.
+
+Each attention head computes dot products between its query and all cached keys (scaled by √d_head), applies softmax to get attention weights, and takes a weighted sum of the cached values. The outputs of all heads are concatenated and projected through attn_wo.
+
+It's worth emphasizing that the Attention block is the exact and only place where a token at position t gets to "look" at tokens in the past 0..t-1. Attention is a token communication mechanism.
+
+The division by √head_dim prevents the dot products from getting too large, which would make softmax extremely peaked.
+
+### Why multiple heads?
+
+Each head independently decides what to attend to. One head might track the previous character, another vowel patterns, another repetition. Multi-head attention lets the model attend to different patterns simultaneously. Our model has 4 heads; GPT-4 uses 96+.
+
+### Code (microgpt.py lines 114–144)
+
+```python
+114     for li in range(n_layer):
+115         # 1) Multi-head Attention block
+116         x_residual = x
+117         x = rmsnorm(x)
+118         q = linear(x, state_dict[f'layer{li}.attn_wq'])
+119         k = linear(x, state_dict[f'layer{li}.attn_wk'])
+120         v = linear(x, state_dict[f'layer{li}.attn_wv'])
+121         keys[li].append(k)
+122         values[li].append(v)
+123         x_attn = []
+124         for h in range(n_head):
+125             hs = h * head_dim
+126             q_h = q[hs:hs+head_dim]
+127             k_h = [ki[hs:hs+head_dim] for ki in keys[li]]
+128             v_h = [vi[hs:hs+head_dim] for vi in values[li]]
+129             # Dot-product attention with scaling
+130             attn_logits = [
+131                 sum(q_h[j] * k_h[t][j]
+132                     for j in range(head_dim))
+133                 / head_dim**0.5
+134                 for t in range(len(k_h))
+135             ]
+136             attn_weights = softmax(attn_logits)
+137             head_out = [
+138                 sum(attn_weights[t] * v_h[t][j]
+139                     for t in range(len(v_h)))
+140                 for j in range(head_dim)
+141             ]
+142             x_attn.extend(head_out)  # concat heads
+143         x = linear(x_attn, state_dict[f'layer{li}.attn_wo'])
+144         x = [a + b for a, b in zip(x, x_residual)]
+```
+
+### Code Annotations
+
+- **Layer loop + residual save** (lines 114–116): Iterates through transformer layers (just 1 here, 100+ in GPT-4). x_residual saves the input so we can add it back later — this "skip connection" is critical for training deep networks.
+- **QKV projections** (lines 117–120): Three linear projections create Query, Key, and Value vectors. Q asks "what am I looking for?", K advertises "what do I contain?", V holds "what information do I provide if selected?" Each is a matrix multiply: 16→16.
+- **KV cache append** (lines 121–122): Keys and values are stored for all previous positions. This is the KV cache — it lets us process one token at a time without recomputing attention over the whole sequence. At position t, we attend to positions 0..t.
+- **Split into heads** (lines 123–128): The 16-dim vectors are split into 4 heads of 4 dimensions each. Each head independently selects which past tokens to attend to. This lets the model learn multiple attention patterns simultaneously.
+- **Attention scores** (lines 129–134): Dot product between query and each cached key, divided by √head_dim (=2). The scaling prevents large dot products from making softmax too peaked. Higher score = this past token is more relevant to the current query.
+- **Softmax → weights** (line 135): Converts raw scores to a probability distribution over past tokens. The attention weights always sum to 1.0. Softmax is shift-invariant (subtracting max for numerical stability happens inside our softmax function).
+- **Weighted value sum** (lines 136–140): Each head's output is a weighted average of all past value vectors, using the attention weights. Tokens that matched the query strongly contribute more. This is how information flows between positions.
+- **Concat + project + residual** (lines 141–142): Head outputs (4 heads × 4 dims = 16) are concatenated and projected through attn_wo. The result is added back to x_residual — this residual connection lets gradients flow directly and makes training stable.
+
+---
+
+## Step 8: Transform
+*MLP computation*
+
+### Narrative
+
+MLP is short for "multilayer perceptron" — a two-layer feed-forward network: project up to 4× the embedding dimension, apply ReLU, project back down. This is where the model does most of its "thinking" per position.
+
+Unlike attention, this computation is fully local to the current time step. The Transformer intersperses communication (Attention) with computation (MLP).
+
+The expand-then-contract pattern (4× expansion is standard) creates a wider intermediate space where the network can compute more complex functions. ReLU zeroes out negatives, creating sparse activation patterns. Without this nonlinearity, stacking linear layers would collapse into one big linear transformation — no learning power.
+
+Residual connections (x = [a + b for ...]) appear after both the attention and MLP blocks. Both blocks add their output back to their input. This lets gradients flow directly through the network and makes deeper models trainable.
+
+The final hidden state is projected to vocabulary size by lm_head, producing one logit per token. Higher logit = the model thinks that corresponding token is more likely to come next.
+
+### Why residual connections matter
+
+Without residual connections, gradients vanish in deep networks and training fails. The "shortcut" path lets gradients flow directly backward, like an express lane. This is why transformers can be stacked 100+ layers deep when earlier architectures couldn't.
+
+### Code (microgpt.py lines 94–118)
+
+```python
+ 94 def linear(x, w):
+ 95     return [sum(wi * xi for wi, xi in zip(wo, x))
+ 96             for wo in w]
+ 97 
+ 98 def softmax(logits):
+ 99     max_val = max(val.data for val in logits)
+100     exps = [(val - max_val).exp() for val in logits]
+101     total = sum(exps)
+102     return [e / total for e in exps]
+103 
+104         # 2) MLP block
+105         x_residual = x
+106         x = rmsnorm(x)
+107         # Expand: 16 → 64 (4x wider)
+108         x = linear(x, state_dict[f'layer{li}.mlp_fc1'])
+109         # Nonlinearity: ReLU kills negatives
+110         x = [xi.relu() for xi in x]
+111         # Contract: 64 → 16
+112         x = linear(x, state_dict[f'layer{li}.mlp_fc2'])
+113         # Residual connection
+114         x = [a + b for a, b in zip(x, x_residual)]
+115 
+116     # Output: project to vocabulary logits
+117     logits = linear(x, state_dict['lm_head'])
+118     return logits  # 27 numbers, one per token
+```
+
+### Code Annotations
+
+- **Linear projection** (lines 94–96): Matrix-vector multiply: each output is a dot product of one weight row with the input. This is the fundamental building block — attention projections, MLP layers, and the final output all use this same operation.
+- **Softmax** (lines 98–102): Converts raw logits to probabilities that sum to 1. Subtracting max_val prevents numerical overflow in exp() without changing the result (softmax is shift-invariant). Used for both attention weights and output probabilities.
+- **MLP: save residual + normalize** (lines 104–106): Same pattern as attention: save input for the skip connection, then normalize. Pre-norm ensures the MLP sees well-scaled inputs regardless of what attention did.
+- **MLP: expand (16→64)** (lines 107–108): Projects to 4× the embedding dimension, creating a wider space for computation. This expansion ratio (4×) is a standard transformer design choice, used in GPT-2 through GPT-4.
+- **MLP: ReLU activation** (lines 109–110): Zeroes out negative values, creating sparsity. Without this nonlinearity, the expand-then-contract would be equivalent to a single linear layer. ReLU is what gives the network its ability to learn complex, nonlinear patterns.
+- **MLP: contract (64→16)** (lines 111–112): Projects back to the embedding dimension. The expand→nonlinearity→contract pattern lets the model compute arbitrary nonlinear functions of each token's representation.
+- **Residual connection** (lines 113–114): Adds the MLP output back to the input (saved on line 12). Both attention and MLP blocks use this pattern. It ensures information can flow through the network even if a block learns nothing useful.
+- **Output projection** (lines 116–118): The final linear layer maps the 16-dim hidden state to 27 logits (one per token in the vocabulary). Higher logit = the model thinks that token is more likely to come next. These logits become probabilities via softmax.
+
+---
+
+## Step 9: Train
+*Predict → loss → backprop → update*
+
+### Narrative
+
+The training loop repeatedly: (1) picks a document, (2) runs the model forward over its tokens, (3) computes a loss, (4) backpropagates to get gradients, and (5) updates the parameters.
+
+We feed tokens through the model one at a time, building up the KV cache. At each position, the model outputs 27 logits, which we convert to probabilities via softmax. The loss at each position is the negative log probability of the correct next token: −log p(target). This is called the cross-entropy loss.
+
+Intuitively, the loss measures surprise: how shocked the model is by what actually comes next. If the model assigns probability 1.0 to the correct token, loss is 0 (not surprised). If it assigns probability close to 0, loss goes to +∞ (very surprised). We average across the document to get a single scalar loss.
+
+One call to loss.backward() runs backpropagation through the entire computation graph. After this, each parameter's .grad tells us how to change it to reduce the loss.
+
+Over 1,000 steps the loss decreases from ~3.3 (random guessing among 27 tokens: −log(1/27) ≈ 3.3) down to ~2.37. The knowledge of the statistical patterns is distilled into the parameters.
+
+### What about the KV cache during training?
+
+We're using a KV cache during training, which is unusual. People typically associate it with inference only. But the KV cache is conceptually always there — in production implementations, it's just hidden inside the highly vectorized attention computation. Since microgpt processes one token at a time, we build it explicitly. Unlike typical inference, here the cached keys and values are live Value nodes, so we actually backpropagate through them.
+
+### Code (microgpt.py lines 152–184)
+
+```python
+152 num_steps = 1000
+153 for step in range(num_steps):
+154     # 1. Pick a document and tokenize
+155     doc = docs[step % len(docs)]
+156     tokens = [BOS] + [uchars.index(ch) for ch in doc] + [BOS]
+157     n = min(block_size, len(tokens) - 1)
+158 
+159     # 2. Forward pass: predict each next token
+160     keys = [[] for _ in range(n_layer)]
+161     values = [[] for _ in range(n_layer)]
+162     losses = []
+163     for pos_id in range(n):
+164         token_id = tokens[pos_id]
+165         target_id = tokens[pos_id + 1]  # what comes next
+166         logits = gpt(token_id, pos_id, keys, values)
+167         probs = softmax(logits)
+168         loss_t = -probs[target_id].log()  # cross-entropy
+169         losses.append(loss_t)
+170     # Average loss. May yours be low.
+171     loss = (1/n) * sum(losses)
+172 
+173     # 3. Backward pass: compute all gradients
+174     loss.backward()
+175 
+176     # 4. Adam optimizer: update parameters
+177     lr_t = learning_rate * (1 - step / num_steps)
+178     for i, p in enumerate(params):
+179         m[i] = beta1*m[i] + (1-beta1)*p.grad
+180         v[i] = beta2*v[i] + (1-beta2)*p.grad**2
+181         m_hat = m[i] / (1 - beta1**(step+1))
+182         v_hat = v[i] / (1 - beta2**(step+1))
+183         p.data -= lr_t * m_hat / (v_hat**0.5 + eps)
+184         p.grad = 0  # reset for next step
+```
+
+### Code Annotations
+
+- **Training loop** (lines 152–155): Iterates 1,000 times. Each step picks one document (cycling through the dataset), tokenizes it with BOS delimiters, and clips to block_size. In production, you'd use batches of many documents for efficiency.
+- **Initialize caches** (lines 157–159): Fresh KV caches for each document. keys and values are lists-of-lists: one per layer, each growing as we process tokens. losses collects per-position loss values for averaging.
+- **Token-by-token forward** (lines 160–162): Process tokens sequentially. At each position, token_id is the input and target_id is what should come next. The model sees positions 0..t and must predict position t+1. This is causal (left-to-right) language modeling.
+- **Loss computation** (lines 163–165): The model outputs logits → softmax gives probabilities → take -log of the probability assigned to the correct next token. This cross-entropy loss measures surprise: -log(1.0) = 0 (not surprised), -log(0.01) = 4.6 (very surprised).
+- **Average loss** (lines 167–168): Sum per-position losses and divide by sequence length. This gives a single scalar that measures how well the model predicted this entire document. "May yours be low" — Karpathy's benediction.
+- **Backpropagation** (lines 170–171): One call walks the entire computation graph backward, computing ∂loss/∂p for every parameter. This is where the autograd engine from step 2 does its work. After this, every param.grad tells us how to reduce the loss.
+- **Adam optimizer update** (lines 173–181): For each parameter: update momentum (m) and adaptive rate (v), apply bias correction, then nudge p.data in the direction that reduces loss. Learning rate decays linearly so early steps explore broadly and late steps refine.
+
+---
+
+## Step 10: Update
+*Adjust parameters (Adam)*
+
+### Narrative
+
+We could just do p.data -= lr * p.grad (gradient descent), but Adam is smarter. It maintains two running averages per parameter:
+
+• m tracks the mean of recent gradients (momentum, like a rolling ball — helps push through flat regions)
+• v tracks the mean of recent squared gradients (adapting the learning rate per parameter — parameters with consistently large gradients get smaller effective learning rates)
+
+The m_hat and v_hat are bias corrections that account for the fact that m and v are initialized to zero and need warmup. The learning rate decays linearly over training: large steps early (explore), small steps late (refine). After updating, we reset .grad = 0 for the next step.
+
+Adam is used in virtually all modern LLM training because it converges faster and more reliably than basic SGD. At scale, optimization becomes its own discipline — teams run extensive smaller-scale experiments to predict the right settings before committing to a full training run, because getting any detail wrong can waste millions of dollars of compute.
+
+### What changes at scale?
+
+At scale, models train in reduced precision (bfloat16 or fp8) across large GPU clusters. Optimizer settings (learning rate, weight decay, beta parameters, warmup, decay schedule) must be tuned precisely — the right values depend on model size, batch size, and dataset composition. Scaling laws (e.g. Chinchilla) guide how to allocate a fixed compute budget between model size and number of training tokens.
+
+### Code (microgpt.py lines 146–170)
+
+```python
+146 # Let there be Adam, the blessed optimizer
+147 learning_rate = 0.01
+148 beta1, beta2, eps = 0.85, 0.99, 1e-8
+149 m = [0.0] * len(params)  # momentum (1st moment)
+150 v = [0.0] * len(params)  # adaptive rate (2nd moment)
+151 
+152 # Linear learning rate decay
+153 lr_t = learning_rate * (1 - step / num_steps)
+154 
+155 for i, p in enumerate(params):
+156     # Momentum: exponential moving avg of gradients
+157     m[i] = beta1 * m[i] + (1 - beta1) * p.grad
+158 
+159     # Adaptive rate: EMA of squared gradients
+160     v[i] = beta2 * v[i] + (1 - beta2) * p.grad**2
+161 
+162     # Bias correction (warmup)
+163     m_hat = m[i] / (1 - beta1**(step + 1))
+164     v_hat = v[i] / (1 - beta2**(step + 1))
+165 
+166     # THE UPDATE
+167     p.data -= lr_t * m_hat / (v_hat**0.5 + eps)
+168     p.grad = 0  # reset for next step
+169 
+170 # Loss curve: 3.3 → 2.37 over 1000 steps
+```
+
+### Code Annotations
+
+- **Adam initialization** (lines 146–150): Learning rate 0.01, relatively high for this small model. beta1=0.85 controls momentum decay (how much to remember past gradients). beta2=0.99 controls adaptive rate decay. m and v are per-parameter running averages, initialized to zero.
+- **Learning rate decay** (lines 152–153): Linear decay from 0.01 to 0 over training. Large steps early to explore the loss landscape broadly, small steps late to fine-tune. Most production systems use cosine decay instead, but linear works fine here.
+- **Momentum update** (lines 155–157): Exponential moving average of gradients. Like a rolling ball: if gradients consistently point the same direction, momentum builds up and pushes through flat regions or noise. beta1=0.85 means ~85% old momentum + 15% new gradient.
+- **Adaptive rate** (lines 159–160): EMA of squared gradients tracks the typical magnitude of each parameter's gradient. Parameters with large, volatile gradients get effectively smaller learning rates. This per-parameter adaptation is what makes Adam better than basic SGD.
+- **Bias correction** (lines 162–164): Since m and v start at 0, early estimates are biased toward 0. Dividing by (1 - beta^step) corrects this. The correction is large for early steps and approaches 1.0 as training progresses. Without it, early updates would be too small.
+- **The parameter update** (lines 166–168): The actual weight change: step size is lr × (momentum / √adaptive_rate). The eps (1e-8) prevents division by zero. After updating, grad is reset to 0 for the next training step's backward pass.
+
+---
+
+## Step 11: Predict
+*Generate new text*
+
+### Narrative
+
+Once training is done, we can sample new names from the model. The parameters are frozen and we just run the forward pass in a loop, feeding each generated token back as the next input.
+
+We start each sample with BOS, which tells the model "begin a new name." The model produces 27 logits, we convert them to probabilities, and we randomly sample one token. That token gets fed back in as the next input, and we repeat until the model produces BOS again ("I'm done") or we hit the maximum sequence length.
+
+The temperature parameter controls randomness. Before softmax, we divide the logits by the temperature. A temperature of 1.0 samples directly from the model's learned distribution. Lower temperatures (like 0.5 here) sharpen the distribution, making the model more conservative. A temperature approaching 0 always picks the single most likely token (greedy decoding). Higher temperatures flatten the distribution — more diverse but potentially less coherent.
+
+The generated names (kamon, karai, vialan, alerin...) don't exist in the training data — they are statistical hallucinations that sound plausible given the patterns the model learned.
+
+### How does this relate to ChatGPT?
+
+ChatGPT is this same core loop (predict next token, sample, repeat) scaled up enormously, with post-training to make it conversational. When you chat with it, the system prompt, your message, and its reply are all just tokens in a sequence. The model is completing the document one token at a time, same as microgpt completing a name.
+
+### Code (microgpt.py lines 187–213)
+
+```python
+187 temperature = 0.5  # creativity dial
+188 
+189 for sample_idx in range(20):
+190     keys = [[] for _ in range(n_layer)]
+191     values = [[] for _ in range(n_layer)]
+192     token_id = BOS       # start with BOS
+193     sample = []
+194 
+195     for pos_id in range(block_size):
+196         # Same forward pass as training, no loss
+197         logits = gpt(token_id, pos_id, keys, values)
+198 
+199         # Scale by temperature, then softmax
+200         probs = softmax([l / temperature for l in logits])
+201 
+202         # Sample from distribution
+203         token_id = random.choices(
+204             range(vocab_size),
+205             weights=[p.data for p in probs]
+206         )[0]
+207 
+208         if token_id == BOS: break  # end of name
+209         sample.append(uchars[token_id])
+210 
+211     print(f"{''.join(sample)}")
+212 # Output: kamon, ann, karai, jaire, vialan,
+213 #   karia, yeran, anna, areli, kaina, ...
+```
+
+### Code Annotations
+
+- **Temperature** (line 187): Controls randomness in generation. Temperature < 1 sharpens the distribution (more conservative, predictable names). Temperature > 1 flattens it (more creative, potentially weird). Temperature → 0 becomes greedy (always pick the most likely token).
+- **Sample loop setup** (lines 189–193): Generate 20 names. Each starts fresh with empty KV caches and the BOS token. The sample list accumulates generated characters. This autoregressive loop is the exact same process ChatGPT uses to generate responses.
+- **Forward pass** (lines 195–197): Same gpt() function as training, but no loss computation. The model sees all tokens generated so far (via KV cache) and outputs 27 logits predicting what comes next.
+- **Temperature scaling** (lines 199–200): Divide logits by temperature BEFORE softmax. With temp=0.5, a logit of 2.0 becomes 4.0 — softmax amplifies the difference, making high-probability tokens even more likely. This is the "creativity dial."
+- **Sampling** (lines 202–206): random.choices picks one token weighted by the probability distribution. Unlike argmax (greedy), this introduces controlled randomness — the model usually picks likely tokens but occasionally surprises, making output more natural and varied.
+- **Stop condition** (lines 208–209): If the model generates BOS, it's signaling "this name is done." We break out of the generation loop. Otherwise, we convert the token ID back to a character and append it.
+- **Output** (lines 211–213): The generated names (kamon, karai, vialan...) don't exist in the training data. They are "hallucinations" — statistically plausible outputs that the model invented by learning character patterns from 32K real names.
+
+---
+
+## Step 12: The Complete Picture
+*Everything else is just efficiency*
+
+### Narrative
+
+microgpt contains the complete algorithmic essence of training and running a GPT. But between this and a production LLM like ChatGPT, there is a long list of things that change. None of them alter the core algorithm, but they are what makes it work at scale.
+
+Data: trillions of tokens of internet text instead of 32K names. Tokenizer: BPE with ~100K vocabulary instead of 27 characters. Autograd: tensors on GPUs instead of scalar Python. Architecture: hundreds of billions of parameters, 100+ layers, with additions like RoPE, GQA, and Mixture of Experts — but the core structure of Attention (communication) and MLP (computation) on a residual stream is preserved.
+
+Post-training turns the document completer into a chatbot: first SFT (supervised fine-tuning on curated conversations), then RL (reinforcement learning from human/model feedback). Algorithmically, the model is still training on documents — but those documents now include tokens from the model itself.
+
+The model doesn't learn explicit rules — it learns a probability distribution that happens to reflect statistical regularities. microgpt "hallucinating" a name like "karia" is the same phenomenon as ChatGPT confidently stating a false fact. Both are plausible-sounding completions that happen not to be real.
+
+If you understand microgpt, you understand the algorithmic essence.
+
+### What next? Run it, extend it, understand it
+
+All you need is Python (no pip install, no dependencies). The script takes about 1 minute on a MacBook. You can also run it in Google Colab. To see the code built up piece by piece, Karpathy provides a progression: train0.py (bigram count table, no neural net), train1.py (MLP + manual gradients), train2.py (autograd replaces manual gradients), train3.py (position embeddings + single-head attention), train4.py (multi-head attention + full GPT). Each file adds one conceptual layer. And the question "does it understand anything?" — mechanically, the model is a big math function that maps input tokens to a probability distribution. Whether that constitutes understanding is up to you, but the mechanism is fully contained in the 200 lines above.
+
+### Code (microgpt.py lines 152–173)
+
+```python
+152 # The ENTIRE training loop:
+153 for step in range(1000):
+154     doc = docs[step % len(docs)]             # 1. Pick data
+155     tokens = [BOS] + tokenize(doc) + [BOS]   # 2. Tokenize
+156 
+157     for pos_id in range(n):
+158         logits = gpt(token_id, pos_id, ...)  # 3. Forward
+159         probs = softmax(logits)
+160         loss_t = -probs[target].log()        # 4. Loss
+161 
+162     loss.backward()                          # 5. Backward
+163 
+164     for p in params:
+165         p.data -= lr * adam_update(p.grad)   # 6. Update
+166         p.grad = 0
+167 
+168 # That's it. Repeat 1000× → trained LLM.
+169 # Everything else is just efficiency.
+170 #
+171 # microgpt.py: 4,192 params, 27 tokens, 1 layer
+172 # GPT-4:       1T+ params, 200K tokens, 120+ layers
+173 # Same algorithm. Different scale.
+```
+
+### Code Annotations
+
+- **Pick data + tokenize** (lines 152–154): The two-step data pipeline: select a document, convert to token IDs with BOS delimiters. This is the same for a 200-line script and a trillion-parameter model — only the data source and tokenizer complexity differ.
+- **Forward pass** (lines 156–159): Feed tokens through the model one by one, get logits, compute loss. The gpt() function encapsulates embeddings → attention → MLP → output projection. Each position predicts the next token independently (given its context).
+- **Backward pass** (line 161): One call computes gradients for all ~4,192 parameters. The autograd engine traces backward through every addition, multiplication, softmax, attention weight, and embedding lookup that happened during the forward pass.
+- **Parameter update** (lines 163–165): Adam adjusts each parameter to reduce the loss, then resets gradients. After 1,000 iterations of this loop, the random initial parameters have been shaped into a model that captures the statistical patterns of English names.
+- **The punchline** (lines 167–171): microgpt and GPT-4 run the same algorithm. The differences are engineering: bigger tensors, more layers, better tokenizers, GPU parallelism, RLHF. But the core loop — forward, loss, backward, update — is exactly what you see here in 200 lines.
+
+
+---
+
+# Glossary
+
+## Text to Numbers
+*How text gets converted into numbers the model can process*
+
+#### Token
+
+The smallest unit of text that a language model works with. In microgpt, each character is a token. In production models like ChatGPT, tokens are usually chunks of characters (like common words or word pieces). The model never sees raw text — it sees a sequence of token IDs (numbers).
+
+Related steps: Tokenize, The Task
+See also: Vocabulary, BPE (Byte Pair Encoding), BOS (Beginning of Sequence)
+
+#### Vocabulary
+
+The complete set of tokens a model knows about. microgpt has 27 tokens (26 lowercase letters + BOS). GPT-4 has roughly 100,000 tokens. A model can only output tokens from its vocabulary — it literally cannot produce a character or word piece it hasn't seen during tokenizer construction.
+
+Related steps: Tokenize
+See also: Token, BPE (Byte Pair Encoding)
+
+#### BOS (Beginning of Sequence)
+
+A special token that marks where a document starts and ends. When the model generates a BOS token, it means "I'm done." In ChatGPT, there are similar special tokens that mark where your message ends and the assistant's reply begins.
+
+Related steps: Tokenize, Predict
+See also: Token
+
+#### BPE (Byte Pair Encoding)
+
+The tokenization method used by most production language models. It starts with individual characters, then repeatedly merges the most common adjacent pairs into single tokens. The word "the" might be one token, while a rare word like "zephyr" gets split into pieces. This makes the model more efficient because it can process more text per step.
+
+Related steps: Tokenize, The Complete Picture
+See also: Token, Vocabulary
+
+#### Embedding
+
+A list of numbers (a vector) that represents a token or position. The model can't work with raw token IDs — it needs rich numerical representations. The embedding table is a lookup: token ID 4 ("e") maps to a specific list of 16 numbers. These numbers are learned during training, so similar tokens end up with similar embeddings.
+
+Related steps: Embed, Parameters
+See also: Token, Vector
+
+---
+
+## Model Structure
+*The building blocks of the neural network*
+
+#### Parameter
+
+A single number inside the model that gets adjusted during training. Parameters start as small random numbers, and training gradually shapes them to encode useful patterns. microgpt has 4,192 parameters. GPT-4 has over a trillion. The parameters collectively ARE the model's "knowledge."
+
+Related steps: Parameters, Train, Update
+See also: Weight / Weight Matrix, Gradient
+
+#### Weight / Weight Matrix
+
+A grid (matrix) of parameters. Neural networks organize their parameters into matrices like the embedding table or attention projections. "Weights" and "parameters" are often used interchangeably. A "weight matrix" is just a rectangular array of learnable numbers.
+
+Related steps: Parameters, Attend, Transform
+See also: Parameter, State Dict
+
+#### State Dict
+
+A dictionary (lookup table) that organizes all the model's weight matrices by name. Borrowed from PyTorch terminology. For example, state_dict["wte"] is the token embedding table, state_dict["layer0.attn_wq"] is the query weight matrix for layer 0. It's like a filing cabinet for the model's knowledge.
+
+Related steps: Parameters
+See also: Parameter, Weight / Weight Matrix
+
+#### Vector
+
+A list of numbers. In this context, a vector represents a token's state at a given point in the network. microgpt uses 16-number vectors; GPT-4 uses ~12,000-number vectors. The more numbers, the more nuance the model can capture. All the model's internal computations involve manipulating these vectors.
+
+Related steps: Embed, Attend
+See also: Embedding, Dimension (n_embd)
+
+#### Dimension (n_embd)
+
+The size of the model's internal vectors. microgpt uses dimension 16, meaning each token is represented by 16 numbers. GPT-4 uses ~12,288. Larger dimensions let the model represent more subtle patterns, but require more computation and memory. This is one of the main knobs for scaling a model up.
+
+Related steps: Parameters, Embed
+See also: Vector, Parameter
+
+#### MLP (Multilayer Perceptron)
+
+A two-layer mini-network inside each transformer layer. It expands the vector to 4× its size, applies a nonlinearity (ReLU), then compresses back. Unlike attention (which lets tokens communicate), the MLP processes each token independently. Think of attention as "gathering information" and MLP as "thinking about it."
+
+Related steps: Transform
+See also: ReLU (Rectified Linear Unit), Attention, Residual Connection (Skip Connection)
+
+#### ReLU (Rectified Linear Unit)
+
+A simple function: if the input is positive, keep it; if negative, output zero. Written as max(0, x). This "nonlinearity" is what gives neural networks their power. Without it, stacking multiple layers would be mathematically equivalent to a single layer, and the model couldn't learn complex patterns.
+
+Related steps: Backprop, Transform
+See also: MLP (Multilayer Perceptron)
+
+#### Residual Connection (Skip Connection)
+
+Adding a layer's input back to its output: output = layer(x) + x. Like having an express lane alongside the regular road. This lets information and gradients flow directly through the network, making deep models trainable. Without residual connections, networks deeper than ~10 layers fail to learn.
+
+Related steps: Attend, Transform
+See also: Gradient, Layer (Transformer Layer)
+
+#### RMSNorm (Root Mean Square Normalization)
+
+A technique that rescales a vector so its values stay within a reasonable range. Without normalization, values can grow or shrink as they pass through layers, causing training to become unstable. It's like periodically recalibrating an instrument to keep measurements accurate.
+
+Related steps: Embed
+See also: Layer (Transformer Layer)
+
+---
+
+## Attention Mechanism
+*How tokens look at and learn from each other*
+
+#### Attention
+
+The mechanism that lets tokens look at and gather information from earlier tokens in the sequence. Each token asks "what am I looking for?" (query), earlier tokens advertise "what do I have?" (key), and if there's a match, information flows (value). This is the ONLY place where tokens communicate with each other.
+
+Related steps: Attend
+See also: Query, Key, Value (Q, K, V), Attention Head, KV Cache
+
+#### Query, Key, Value (Q, K, V)
+
+Three vectors computed for each token in the attention mechanism. Think of it like a search engine: the Query is your search query, the Keys are page titles, and Values are the page content. The model computes how well each Query matches each Key (dot product), then retrieves a weighted mix of the Values. Tokens whose keys best match the query contribute most.
+
+Related steps: Attend
+See also: Attention, Attention Head
+
+#### Attention Head
+
+One independent attention computation. Each head can learn to look for different patterns — one might track the previous character, another might look for vowel patterns. Multiple heads run in parallel, and their outputs are combined. microgpt has 4 heads; GPT-4 has 96+.
+
+Related steps: Attend
+See also: Attention, Query, Key, Value (Q, K, V)
+
+#### KV Cache
+
+A memory that stores the Key and Value vectors from all previous tokens so they don't need to be recomputed. When generating token #50, the model needs to attend to tokens #1–49. Instead of reprocessing all of them, it just looks up their cached Keys and Values. This is crucial for fast inference in production systems.
+
+Related steps: Attend, Train, Predict
+See also: Attention, Query, Key, Value (Q, K, V)
+
+#### Softmax
+
+A function that converts a list of arbitrary numbers (logits) into a probability distribution — all positive and summing to 1.0. Larger inputs get exponentially more probability mass. Used both in attention (to weight how much each past token matters) and at the output (to get the probability of each possible next token).
+
+Related steps: Attend, Transform, Train, Predict
+See also: Logit, Temperature
+
+---
+
+## Learning & Training
+*How the model improves by adjusting its parameters*
+
+#### Gradient
+
+A number that tells you: "if I increase this parameter by a tiny amount, how much does the loss change?" Positive gradient means increasing the parameter increases the loss (bad), so we should decrease it. Negative gradient means increasing it decreases the loss (good). Gradients are the compass that guides training.
+
+Related steps: Backprop, Train, Update
+See also: Backpropagation (Backward Pass), Loss (Cross-Entropy Loss), Chain Rule
+
+#### Backpropagation (Backward Pass)
+
+The algorithm that computes gradients for every parameter in one efficient sweep. It starts at the loss and works backward through the computation graph, using the chain rule to calculate how each parameter contributed to the final loss. One forward pass computes the answer; one backward pass tells us how to improve it.
+
+Related steps: Backprop, Train
+See also: Gradient, Chain Rule, Autograd (Automatic Differentiation)
+
+#### Chain Rule
+
+A rule from calculus that lets you compute the derivative of a composite function by multiplying the derivatives along the chain. If a car is 2× faster than a bike, and the bike is 4× faster than walking, the car is 2×4=8× faster than walking. Backpropagation is just the chain rule applied systematically through the computation graph.
+
+Related steps: Backprop
+See also: Gradient, Backpropagation (Backward Pass)
+
+#### Autograd (Automatic Differentiation)
+
+A system that automatically tracks every mathematical operation and can compute gradients through the entire chain. In microgpt, the Value class wraps numbers and records how they were computed. When you call .backward(), autograd traces back through every operation to compute all gradients. PyTorch's autograd does the same thing, just on tensors instead of scalars.
+
+Related steps: Backprop
+See also: Gradient, Backpropagation (Backward Pass), Value (Autograd Wrapper)
+
+#### Value (Autograd Wrapper)
+
+The building block of microgpt's autograd engine. Each Value wraps a single number and remembers: (1) the number itself (.data), (2) its gradient (.grad), and (3) how it was computed (children + local gradients). Every math operation creates a new Value that records the computation, building up a graph that backward() can trace.
+
+Related steps: Backprop
+See also: Autograd (Automatic Differentiation), Gradient
+
+#### Loss (Cross-Entropy Loss)
+
+A single number that measures how wrong the model's predictions are. Specifically, it's the negative log of the probability the model assigned to the correct next token: -log(p). If the model is confident and correct (p ≈ 1), loss ≈ 0. If it's surprised by the right answer (p ≈ 0), loss → ∞. The entire goal of training is to make this number smaller.
+
+Related steps: Train
+See also: Gradient, Softmax
+
+#### Forward Pass
+
+Running input data through the model to get a prediction. Tokens go in → embeddings → attention → MLP → logits come out. This is the "thinking" step. During training, we compare the prediction to the correct answer to compute the loss. During inference, we just use the prediction directly.
+
+Related steps: Train, Predict
+See also: Backpropagation (Backward Pass), Logit
+
+#### Training Loop
+
+The repeating cycle that teaches the model: (1) pick training data, (2) run the forward pass, (3) compute loss, (4) run the backward pass to get gradients, (5) update parameters using the optimizer. Repeat thousands to millions of times. Each cycle makes the model slightly better at predicting the next token.
+
+Related steps: Train
+See also: Forward Pass, Backpropagation (Backward Pass), Adam Optimizer
+
+#### Adam Optimizer
+
+A smart algorithm for updating parameters during training. Instead of just subtracting the gradient (basic gradient descent), Adam keeps a running average of past gradients (momentum — like a rolling ball) and adapts the learning rate for each parameter individually. Parameters with noisy gradients get smaller updates. Used in virtually all modern LLM training.
+
+Related steps: Update
+See also: Gradient, Learning Rate, Parameter
+
+#### Learning Rate
+
+How big a step to take when updating parameters. Too large: the model overshoots and training is unstable. Too small: training is painfully slow. microgpt uses 0.01, decaying to 0 over training — big steps early to explore, small steps late to refine. Getting this right is critical; the wrong learning rate can waste the entire training run.
+
+Related steps: Update, Train
+See also: Adam Optimizer, Parameter
+
+#### Epoch / Training Step
+
+One training step processes one document (or batch of documents). microgpt runs 1,000 steps, each processing one name. An epoch is one complete pass through the entire dataset. The loss decreases from ~3.3 (random guessing) to ~2.37 as the model learns the statistical patterns.
+
+Related steps: Train
+See also: Training Loop, Loss (Cross-Entropy Loss)
+
+---
+
+## Generation & Output
+*How the trained model produces new text*
+
+#### Logit
+
+A raw, unnormalized score that the model outputs — one per token in the vocabulary. Before softmax, these are just numbers (positive or negative) where higher means "more likely." After softmax converts them to probabilities, we can sample from them or pick the most likely token.
+
+Related steps: Transform, Predict
+See also: Softmax, Temperature
+
+#### Inference (Generation)
+
+Using a trained model to generate new text. The model starts with a prompt (or just BOS), predicts the next token, samples one, feeds it back in, and repeats. The parameters are frozen — no learning happens. This is what ChatGPT does when you chat with it: autoregressive token-by-token generation.
+
+Related steps: Predict
+See also: Temperature, Sampling, Forward Pass
+
+#### Temperature
+
+A "creativity dial" that controls how random the model's output is. Logits are divided by temperature before softmax. Temperature = 1.0 uses the model's natural distribution. Lower values (like 0.5) make the model more conservative and predictable. Higher values make it more random and creative. Temperature → 0 always picks the single most likely token.
+
+Related steps: Predict
+See also: Softmax, Logit, Sampling
+
+#### Sampling
+
+Randomly choosing the next token according to the probability distribution (as opposed to always picking the most likely one). This controlled randomness is what makes generated text varied and natural-sounding. Each time you run the model, you might get different output because of sampling.
+
+Related steps: Predict
+See also: Temperature, Softmax
+
+#### Hallucination
+
+When a model generates something that sounds plausible but isn't real. microgpt "hallucinates" names like "karia" that don't exist in the training data. ChatGPT hallucinating a fake citation is the same phenomenon at a larger scale — the model produces statistically plausible completions that happen not to be factually correct.
+
+Related steps: Predict, The Complete Picture
+See also: Inference (Generation), Sampling
+
+---
+
+## The Big Picture
+*Architecture concepts and scaling*
+
+#### Layer (Transformer Layer)
+
+One complete processing block consisting of attention (communication) followed by MLP (computation), each with residual connections. Data flows through one layer, then the next. microgpt has 1 layer; GPT-4 has 120+. More layers = more rounds of processing = more sophisticated reasoning.
+
+Related steps: Parameters, Attend, Transform, The Complete Picture
+See also: Attention, MLP (Multilayer Perceptron), Residual Connection (Skip Connection)
+
+#### Context Window (Block Size)
+
+The maximum number of tokens the model can "see" at once. microgpt's context window is 16 tokens (the longest name is 15 characters). GPT-4 can handle 128K+ tokens. The model can only attend to tokens within this window — anything before it is forgotten. This is why very long conversations sometimes lose earlier context.
+
+Related steps: Parameters, Attend
+See also: Attention, Token
+
+#### Transformer
+
+The neural network architecture used by all modern LLMs. Its core idea: alternate between attention (letting tokens communicate) and MLP (processing information locally), connected by residual connections and normalization. Introduced in the 2017 paper "Attention is All You Need." GPT, BERT, LLaMA, and Claude are all transformers.
+
+Related steps: The Task, Attend, Transform, The Complete Picture
+See also: Attention, MLP (Multilayer Perceptron), Layer (Transformer Layer)
+
+#### GPT (Generative Pre-trained Transformer)
+
+A type of transformer that generates text by predicting one token at a time, left to right. "Generative" = it produces text. "Pre-trained" = trained on a huge text dataset before being fine-tuned for specific tasks. "Transformer" = the architecture. microgpt is a minimal GPT; ChatGPT is a very large one with additional post-training.
+
+Related steps: The Task, The Complete Picture
+See also: Transformer, Post-Training (SFT + RLHF)
+
+#### Post-Training (SFT + RLHF)
+
+Additional training that turns a text-completing model into a helpful chatbot. SFT (Supervised Fine-Tuning) trains the model on curated conversations. RLHF (Reinforcement Learning from Human Feedback) teaches it what humans consider helpful, harmless, and honest. microgpt skips this — it's a pure pre-trained model.
+
+Related steps: The Complete Picture
+See also: GPT (Generative Pre-trained Transformer), Training Loop
+
+#### Tensor
+
+A multi-dimensional array of numbers. A single number is a 0D tensor. A list is a 1D tensor (vector). A table is a 2D tensor (matrix). microgpt uses plain Python lists and individual numbers. Production models use tensors on GPUs for massive parallel computation — same math, much faster.
+
+Related steps: The Complete Picture, Backprop
+See also: Vector, Parameter
+
+---
+
+# Scale Comparison: microgpt vs Production LLMs
+
+| Dimension | microgpt | Production |
+|-----------|----------|------------|
+| Parameters | 4,192 | 100B – 1T+ |
+| Layers | 1 | 80 – 120+ |
+| Embedding dim | 16 | 8,192 – 12,288 |
+| Context window | 16 tokens | 128K – 1M+ |
+| Vocabulary | 27 chars | 100K – 200K tokens |
+| Training data | 32K names | Trillions of tokens |
+| Compute | Python scalars | Thousands of GPUs |
+| Tokenizer | Character-level | BPE / SentencePiece |
+| Post-training | None | SFT + RLHF |

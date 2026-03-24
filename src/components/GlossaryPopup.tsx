@@ -1,9 +1,10 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ArrowRight, ChevronLeft, ChevronRight, Pin } from 'lucide-react'
-import { glossary, type GlossaryEntry } from '@/data/glossary'
+import { glossary, type GlossaryEntry, glossaryCategories } from '@/data/glossary'
 import { steps } from '@/data/steps'
 import { useTheme } from '@/context/Theme'
+import { CopyToChatbot } from './CopyToChatbot'
 
 interface GlossaryPopupProps {
   termId: string | null
@@ -115,6 +116,12 @@ export function GlossaryPopup({ termId, onClose, onOpenTerm, onNavigateStep, onP
                 </button>
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                <CopyToChatbot
+                  type="glossary"
+                  title={entry.term}
+                  category={glossaryCategories.find(c => c.id === entry.category)?.label}
+                  className={`p-1.5 rounded-lg transition-colors ${d ? 'text-gray-500 hover:bg-gray-700 hover:text-purple-400' : 'text-gray-400 hover:bg-purple-50 hover:text-purple-600'}`}
+                />
                 {onPin && (
                   <button
                     onClick={() => onPin(entry.id)}

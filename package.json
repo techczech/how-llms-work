@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "generate:llms": "bun scripts/generate-llms-txt.ts",
+    "build": "bun run generate:llms && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

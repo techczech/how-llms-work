@@ -1,8 +1,9 @@
 import { useMemo, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Step } from '@/data/steps'
-import { BLOG_URL } from '@/data/steps'
+import { steps, BLOG_URL } from '@/data/steps'
 import { glossary } from '@/data/glossary'
+import { CopyToChatbot } from './CopyToChatbot'
 
 interface NarrativePanelProps {
   step: Step
@@ -85,14 +86,17 @@ export function NarrativePanel({ step, showExpandable, onToggleExpandable, onGlo
     <div className="h-full flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
       <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
         <span className="text-sm font-medium text-gray-700">From Karpathy's Guide</span>
-        <a
-          href={BLOG_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-purple-600 hover:text-purple-800 hover:underline"
-        >
-          Read full post ↗
-        </a>
+        <div className="flex items-center gap-1.5">
+          <CopyToChatbot type="step" title={step.title} subtitle={step.subtitle} stepNumber={steps.indexOf(step) + 1} />
+          <a
+            href={BLOG_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-purple-600 hover:text-purple-800 hover:underline"
+          >
+            Read full post ↗
+          </a>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         {linkedParagraphs.map((content, i) => (
