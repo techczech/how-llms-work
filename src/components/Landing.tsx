@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Play, ArrowRight, ExternalLink, Code, BookOpen, BarChart3, Keyboard, GraduationCap, List, Database, FileText, Sparkles, Zap } from 'lucide-react'
+import { Play, ArrowRight, ExternalLink, Code, BookOpen, BarChart3, Keyboard, GraduationCap, List, Database, FileText, Sparkles, Zap, Info } from 'lucide-react'
 import { BLOG_URL, GIST_URL, COLAB_URL, NAMES_URL } from '@/data/steps'
 import { useTheme } from '@/context/Theme'
 import { ThemeToggle } from './ThemeToggle'
@@ -8,9 +8,10 @@ interface LandingProps {
   onStart: (stepIndex?: number) => void
   onPedagogy: () => void
   onGlossary: () => void
+  onAbout: () => void
 }
 
-export function Landing({ onStart, onPedagogy, onGlossary }: LandingProps) {
+export function Landing({ onStart, onPedagogy, onGlossary, onAbout }: LandingProps) {
   const { theme } = useTheme()
   const d = theme === 'dark'
 
@@ -55,6 +56,54 @@ export function Landing({ onStart, onPedagogy, onGlossary }: LandingProps) {
             <Play className="w-5 h-5" />
             Start the walkthrough
             <ArrowRight className="w-5 h-5" />
+          </button>
+        </motion.div>
+
+        {/* Key navigation */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-3 gap-3 mb-16"
+        >
+            <button
+            onClick={onAbout}
+            className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all group ${
+              d ? 'bg-blue-500/5 border-blue-500/20 hover:bg-blue-500/10 hover:border-blue-500/40'
+                : 'bg-blue-50 border-blue-200 hover:bg-blue-100 hover:border-blue-300'
+            }`}
+          >
+            <Info className={`w-6 h-6 ${d ? 'text-blue-400' : 'text-blue-500'}`} />
+            <div>
+              <div className={`text-sm font-semibold group-hover:text-blue-500 transition-colors ${d ? 'text-gray-100' : 'text-gray-800'}`}>About</div>
+              <div className={`text-[11px] ${d ? 'text-gray-500' : 'text-gray-500'}`}>How this was built</div>
+            </div>
+          </button>
+          <button
+            onClick={onPedagogy}
+            className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all group ${
+              d ? 'bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10 hover:border-amber-500/40'
+                : 'bg-amber-50 border-amber-200 hover:bg-amber-100 hover:border-amber-300'
+            }`}
+          >
+            <GraduationCap className={`w-6 h-6 ${d ? 'text-amber-400' : 'text-amber-500'}`} />
+            <div>
+              <div className={`text-sm font-semibold group-hover:text-amber-500 transition-colors ${d ? 'text-gray-100' : 'text-gray-800'}`}>Pedagogy</div>
+              <div className={`text-[11px] ${d ? 'text-gray-500' : 'text-gray-500'}`}>Why this app exists</div>
+            </div>
+          </button>
+          <button
+            onClick={onGlossary}
+            className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all group ${
+              d ? 'bg-purple-500/5 border-purple-500/20 hover:bg-purple-500/10 hover:border-purple-500/40'
+                : 'bg-purple-50 border-purple-200 hover:bg-purple-100 hover:border-purple-300'
+            }`}
+          >
+            <List className={`w-6 h-6 ${d ? 'text-purple-400' : 'text-purple-500'}`} />
+            <div>
+              <div className={`text-sm font-semibold group-hover:text-purple-500 transition-colors ${d ? 'text-gray-100' : 'text-gray-800'}`}>Glossary</div>
+              <div className={`text-[11px] ${d ? 'text-gray-500' : 'text-gray-500'}`}>40+ key terms explained</div>
+            </div>
           </button>
         </motion.div>
 
@@ -230,51 +279,6 @@ export function Landing({ onStart, onPedagogy, onGlossary }: LandingProps) {
               {link.label}
             </a>
           ))}
-        </motion.div>
-
-        {/* Pedagogy + Glossary cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.82 }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12"
-        >
-          <button
-            onClick={onGlossary}
-            className={`flex items-start gap-4 p-5 rounded-xl border text-left transition-colors group ${
-              d
-                ? 'bg-purple-500/5 border-purple-500/20 hover:bg-purple-500/10 hover:border-purple-500/40'
-                : 'bg-purple-50 border-purple-200 hover:bg-purple-100 hover:border-purple-300'
-            }`}
-          >
-            <List className={`w-7 h-7 shrink-0 mt-0.5 ${d ? 'text-purple-400' : 'text-purple-500'}`} />
-            <div>
-              <div className={`font-semibold mb-1 group-hover:text-purple-500 transition-colors ${d ? 'text-gray-100' : 'text-gray-800'}`}>
-                Glossary
-              </div>
-              <div className={`text-xs leading-relaxed ${d ? 'text-gray-400' : 'text-gray-500'}`}>
-                40 key terms explained in plain language — from tokens and embeddings to attention, backpropagation, and temperature.
-              </div>
-            </div>
-          </button>
-          <button
-            onClick={onPedagogy}
-            className={`flex items-start gap-4 p-5 rounded-xl border text-left transition-colors group ${
-              d
-                ? 'bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10 hover:border-amber-500/40'
-                : 'bg-amber-50 border-amber-200 hover:bg-amber-100 hover:border-amber-300'
-            }`}
-          >
-            <GraduationCap className={`w-7 h-7 shrink-0 mt-0.5 ${d ? 'text-amber-400' : 'text-amber-500'}`} />
-            <div>
-              <div className={`font-semibold mb-1 group-hover:text-amber-500 transition-colors ${d ? 'text-gray-100' : 'text-gray-800'}`}>
-                Why this app exists
-              </div>
-              <div className={`text-xs leading-relaxed ${d ? 'text-gray-400' : 'text-gray-500'}`}>
-                Karpathy on teaching through building — the pedagogy behind making LLMs understandable in 200 lines.
-              </div>
-            </div>
-          </button>
         </motion.div>
 
         {/* Footer */}

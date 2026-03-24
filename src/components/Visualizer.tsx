@@ -210,7 +210,7 @@ export function Visualizer({ onBack, onGlossary, onPedagogy, initialStep = 0 }: 
         <div className={`flex flex-col min-h-0 ${showNarrative ? 'w-[38%]' : 'w-[55%]'} transition-all duration-200`}>
           <AnimatePresence mode="wait">
             <motion.div key={step.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-              <CodePanel code={step.code} annotations={step.codeAnnotations} />
+              <CodePanel code={step.code} annotations={step.codeAnnotations} codeStartLine={step.codeStartLine} />
             </motion.div>
           </AnimatePresence>
         </div>

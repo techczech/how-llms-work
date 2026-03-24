@@ -13,6 +13,7 @@ export interface Step {
   narrative: string
   expandable?: { title: string; content: string }
   duration: number
+  codeStartLine?: number
   code: string
   codeAnnotations?: CodeAnnotation[]
 }
@@ -38,6 +39,7 @@ export const steps: Step[] = [
     group: 'context',
     title: 'The Task',
     subtitle: 'What microgpt does and why it matters',
+    codeStartLine: 1,
     narrative: `This is Karpathy's microgpt — a single Python file that trains a tiny neural network on 32,000 baby names and then generates plausible new ones. The entire algorithm fits in 200 lines with zero dependencies: no PyTorch, no TensorFlow, no GPU required. It runs in about a minute on a laptop.
 
 The goal: learn which letters tend to follow which in real names, then "hallucinate" convincing new ones. After training, the model produces names like "kamon", "karai", "vialan", and "alerin" — names that sound real but aren't in the original list.
@@ -88,6 +90,7 @@ random.seed(42) # Let there be order among chaos
     group: 'context',
     title: 'The Data',
     subtitle: '32,033 baby names — each one a "document"',
+    codeStartLine: 14,
     narrative: `The fuel of large language models is text data, optionally separated into a set of documents. In production, each document would be an internet web page, but for microgpt we use a simpler example: 32,033 baby names from US Social Security data, one per line.
 
 The script downloads names.txt automatically if it's not already present. Each name is a "document" — the model's job is to learn the patterns in the data and then generate similar new documents that share the same statistical patterns.
@@ -132,6 +135,7 @@ print(f"num docs: {len(docs)}")
     group: 'preprocessing',
     title: 'Tokenize',
     subtitle: 'Text → integers',
+    codeStartLine: 23,
     narrative: `Under the hood, neural networks work with numbers, not characters, so we need a way to convert text into a sequence of integer token IDs and back. Production tokenizers like tiktoken (used by GPT-4) operate on chunks of characters for efficiency, but the simplest possible tokenizer just assigns one integer to each unique character in the dataset.
 
 We collect all unique characters across the dataset (just the lowercase letters a–z), sort them, and each letter gets an ID by its index. The integer values themselves have no meaning at all — each token is just a separate discrete symbol. Instead of 0, 1, 2 they might as well be different emoji.
@@ -172,6 +176,7 @@ tokens = [BOS] + [uchars.index(ch) for ch in doc] + [BOS]
     group: 'engine',
     title: 'Backprop',
     subtitle: 'Compute gradients',
+    codeStartLine: 30,
     narrative: `Training a neural network requires gradients: for each parameter, we need to know "if I nudge this number up a little, does the loss go up or down, and by how much?"
 
 A Value wraps a single scalar number (.data) and tracks how it was computed. Think of each operation as a little lego block: it takes some inputs, produces an output (the forward pass), and it knows how its output would change with respect to each of its inputs (the local gradient). That's all the information autograd needs. Everything else is just the chain rule, stringing the blocks together.
@@ -251,6 +256,7 @@ Note the += (accumulation, not assignment). When a value is used in multiple pla
     group: 'architecture',
     title: 'Parameters',
     subtitle: 'The model\'s knowledge',
+    codeStartLine: 75,
     narrative: `The parameters are the knowledge of the model. They are a large collection of floating-point numbers (wrapped in Value for autograd) that start out random and are iteratively optimized during training.
 
 Each parameter is initialized to a small random number drawn from a Gaussian distribution. The state_dict organizes them into named matrices (borrowing PyTorch's terminology): embedding tables, attention weights, MLP weights, and a final output projection.
@@ -305,6 +311,7 @@ print(f"num params: {len(params)}")  # 4,192`,
     group: 'architecture',
     title: 'Embed',
     subtitle: 'IDs → vectors',
+    codeStartLine: 103,
     narrative: `The neural network can't process a raw token ID like 5 directly. It can only work with vectors (lists of numbers). So we associate a learned vector with each possible token, and feed that in as its neural signature.
 
 The token ID and position ID each look up a row from their respective embedding tables (wte and wpe). These two vectors are added together, giving the model a representation that encodes both what the token is and where it is in the sequence.
@@ -353,6 +360,7 @@ def gpt(token_id, pos_id, keys, values):
     group: 'architecture',
     title: 'Attend',
     subtitle: 'Tokens communicate',
+    codeStartLine: 114,
     narrative: `The current token is projected into three vectors: a query (Q), a key (K), and a value (V). Intuitively, the query says "what am I looking for?", the key says "what do I contain?", and the value says "what do I offer if selected?"
 
 For example, in the name "emma", when the model is at the second "m" and trying to predict what comes next, it might learn a query like "what vowels appeared recently?" The earlier "e" would have a key that matches this query well, so it gets a high attention weight, and its value (information about being a vowel) flows into the current position.
@@ -415,6 +423,7 @@ The division by √head_dim prevents the dot products from getting too large, wh
     group: 'architecture',
     title: 'Transform',
     subtitle: 'MLP computation',
+    codeStartLine: 94,
     narrative: `MLP is short for "multilayer perceptron" — a two-layer feed-forward network: project up to 4× the embedding dimension, apply ReLU, project back down. This is where the model does most of its "thinking" per position.
 
 Unlike attention, this computation is fully local to the current time step. The Transformer intersperses communication (Attention) with computation (MLP).
@@ -471,6 +480,7 @@ def softmax(logits):
     group: 'training',
     title: 'Train',
     subtitle: 'Predict → loss → backprop → update',
+    codeStartLine: 152,
     narrative: `The training loop repeatedly: (1) picks a document, (2) runs the model forward over its tokens, (3) computes a loss, (4) backpropagates to get gradients, and (5) updates the parameters.
 
 We feed tokens through the model one at a time, building up the KV cache. At each position, the model outputs 27 logits, which we convert to probabilities via softmax. The loss at each position is the negative log probability of the correct next token: −log p(target). This is called the cross-entropy loss.
@@ -534,6 +544,7 @@ for step in range(num_steps):
     group: 'training',
     title: 'Update',
     subtitle: 'Adjust parameters (Adam)',
+    codeStartLine: 146,
     narrative: `We could just do p.data -= lr * p.grad (gradient descent), but Adam is smarter. It maintains two running averages per parameter:
 
 • m tracks the mean of recent gradients (momentum, like a rolling ball — helps push through flat regions)
@@ -587,6 +598,7 @@ for i, p in enumerate(params):
     group: 'using',
     title: 'Predict',
     subtitle: 'Generate new text',
+    codeStartLine: 187,
     narrative: `Once training is done, we can sample new names from the model. The parameters are frozen and we just run the forward pass in a loop, feeding each generated token back as the next input.
 
 We start each sample with BOS, which tells the model "begin a new name." The model produces 27 logits, we convert them to probabilities, and we randomly sample one token. That token gets fed back in as the next input, and we repeat until the model produces BOS again ("I'm done") or we hit the maximum sequence length.
@@ -642,6 +654,7 @@ for sample_idx in range(20):
     group: 'using',
     title: 'The Complete Picture',
     subtitle: 'Everything else is just efficiency',
+    codeStartLine: 152,
     narrative: `microgpt contains the complete algorithmic essence of training and running a GPT. But between this and a production LLM like ChatGPT, there is a long list of things that change. None of them alter the core algorithm, but they are what makes it work at scale.
 
 Data: trillions of tokens of internet text instead of 32K names. Tokenizer: BPE with ~100K vocabulary instead of 27 characters. Autograd: tensors on GPUs instead of scalar Python. Architecture: hundreds of billions of parameters, 100+ layers, with additions like RoPE, GQA, and Mixture of Experts — but the core structure of Attention (communication) and MLP (computation) on a residual stream is preserved.

@@ -120,7 +120,7 @@ export function GlossaryPopup({ termId, onClose, onOpenTerm, onNavigateStep, onP
                   type="glossary"
                   title={entry.term}
                   category={glossaryCategories.find(c => c.id === entry.category)?.label}
-                  className={`p-1.5 rounded-lg transition-colors ${d ? 'text-gray-500 hover:bg-gray-700 hover:text-purple-400' : 'text-gray-400 hover:bg-purple-50 hover:text-purple-600'}`}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors ${d ? 'text-purple-400 hover:bg-gray-700 bg-gray-800' : 'text-purple-600 hover:bg-purple-100 bg-purple-50/50'}`}
                 />
                 {onPin && (
                   <button

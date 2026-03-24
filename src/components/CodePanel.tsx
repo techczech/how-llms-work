@@ -6,10 +6,12 @@ import { MessageSquareText, X } from 'lucide-react'
 interface CodePanelProps {
   code: string
   annotations?: CodeAnnotation[]
+  codeStartLine?: number
 }
 
-export function CodePanel({ code, annotations = [] }: CodePanelProps) {
+export function CodePanel({ code, annotations = [], codeStartLine = 1 }: CodePanelProps) {
   const lines = code.split('\n')
+  const lineOffset = codeStartLine - 1
   const [activeAnnotation, setActiveAnnotation] = useState<CodeAnnotation | null>(null)
 
   // Build a map: line number → annotation (for highlighting)
@@ -41,7 +43,7 @@ export function CodePanel({ code, annotations = [] }: CodePanelProps) {
             <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
             <div className="w-3 h-3 rounded-full bg-[#28c840]" />
           </div>
-          <span className="text-xs text-gray-500 ml-2 font-mono">microgpt.py</span>
+          <span className="text-xs text-gray-500 ml-2 font-mono">microgpt.py <span className="text-gray-600">lines {codeStartLine}–{codeStartLine + lines.length - 1}</span></span>
         </div>
         {annotations.length > 0 && (
           <span className="flex items-center gap-1 text-[10px] text-gray-500">
@@ -73,10 +75,10 @@ export function CodePanel({ code, annotations = [] }: CodePanelProps) {
                         : 'border-l-2 border-transparent'
                   }`}
                 >
-                  <span className={`w-7 text-right mr-4 select-none text-xs leading-[1.6] shrink-0 ${
+                  <span className={`w-8 text-right mr-4 select-none text-xs leading-[1.6] shrink-0 ${
                     isHighlighted ? 'text-purple-400' : isClickable ? 'text-gray-500' : 'text-gray-600'
                   }`}>
-                    {lineNum}
+                    {lineNum + lineOffset}
                   </span>
                   <code className="flex-1 whitespace-pre">
                     <SyntaxLine line={line} />

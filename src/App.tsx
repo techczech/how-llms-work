@@ -3,13 +3,15 @@ import { Landing } from '@/components/Landing'
 import { Visualizer } from '@/components/Visualizer'
 import { Pedagogy } from '@/components/Pedagogy'
 import { Glossary } from '@/components/Glossary'
+import { About } from '@/components/About'
 import { ThemeProvider } from '@/context/Theme'
 
-type View = 'landing' | 'visualizer' | 'pedagogy' | 'glossary'
+type View = 'landing' | 'visualizer' | 'pedagogy' | 'glossary' | 'about'
 
 function viewFromPath(path: string): View {
   if (path === '/pedagogy') return 'pedagogy'
   if (path === '/glossary') return 'glossary'
+  if (path === '/about') return 'about'
   return 'landing'
 }
 
@@ -47,8 +49,10 @@ function App() {
         <Pedagogy onBack={() => navigate('landing', '/')} onStart={() => handleStart()} />
       ) : view === 'glossary' ? (
         <Glossary onBack={() => navigate('landing', '/')} onNavigateStep={(idx) => handleStart(idx)} initialTermId={glossaryTermId} />
+      ) : view === 'about' ? (
+        <About onBack={() => navigate('landing', '/')} onStart={() => handleStart()} />
       ) : (
-        <Landing onStart={handleStart} onPedagogy={() => navigate('pedagogy', '/pedagogy')} onGlossary={() => handleGlossary()} />
+        <Landing onStart={handleStart} onPedagogy={() => navigate('pedagogy', '/pedagogy')} onGlossary={() => handleGlossary()} onAbout={() => navigate('about', '/about')} />
       )}
     </ThemeProvider>
   )
